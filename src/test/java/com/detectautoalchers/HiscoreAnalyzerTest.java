@@ -22,6 +22,27 @@ public class HiscoreAnalyzerTest
         assertTrue(profile.isMagicDominant());
         assertEquals(55, profile.getMagicLevel());
         assertEquals(2, profile.getNonMagicSkillsAboveThreshold());
+        assertTrue(profile.getNonMagicTotalLevel() < 125);
+    }
+
+    @Test
+    public void recordsMatureNonMagicTotalLevel()
+    {
+        HiscoreProfile profile = HiscoreAnalyzer.analyze(resultWithNonMagicLevels(89, 50, 50, 10), 21, 50, 2);
+
+        assertTrue(profile.isMagicDominant());
+        assertTrue(profile.getNonMagicTotalLevel() >= 125);
+        assertTrue(profile.isMatureAccount(125));
+    }
+
+    @Test
+    public void keepsBelowThresholdProfilesUnsuppressed()
+    {
+        HiscoreProfile profile = HiscoreAnalyzer.analyze(resultWithNonMagicLevels(89, 20, 20), 21, 50, 2);
+
+        assertTrue(profile.isMagicDominant());
+        assertTrue(profile.getNonMagicTotalLevel() < 125);
+        assertFalse(profile.isMatureAccount(125));
     }
 
     @Test
@@ -52,8 +73,19 @@ public class HiscoreAnalyzerTest
 
     private HiscoreResult result(int magicLevel, int highNonMagicSkills)
     {
+        int[] nonMagicLevels = new int[highNonMagicSkills];
+        for (int i = 0; i < nonMagicLevels.length; i++)
+        {
+            nonMagicLevels[i] = 11;
+        }
+
+        return resultWithNonMagicLevels(magicLevel, nonMagicLevels);
+    }
+
+    private HiscoreResult resultWithNonMagicLevels(int magicLevel, int... raisedNonMagicLevels)
+    {
         Map<HiscoreSkill, Skill> skills = new EnumMap<>(HiscoreSkill.class);
-        int raised = 0;
+        int raisedIndex = 0;
         for (HiscoreSkill hiscoreSkill : HiscoreSkill.values())
         {
             if (hiscoreSkill.getType() != HiscoreSkillType.SKILL)
@@ -66,10 +98,10 @@ public class HiscoreAnalyzerTest
             {
                 level = magicLevel;
             }
-            else if (raised < highNonMagicSkills)
+            else if (raisedIndex < raisedNonMagicLevels.length)
             {
-                level = 11;
-                raised++;
+                level = raisedNonMagicLevels[raisedIndex];
+                raisedIndex++;
             }
 
             skills.put(hiscoreSkill, new Skill(1, level, 0));

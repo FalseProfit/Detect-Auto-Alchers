@@ -14,10 +14,55 @@ final class DetectorService
 {
     private static final long STALE_MULTIPLIER = 2L;
     private final Map<String, PlayerEvidence> evidenceByName = new LinkedHashMap<>();
+    private final Set<String> suppressedNames = new HashSet<>();
 
     synchronized void clear()
     {
         evidenceByName.clear();
+        suppressedNames.clear();
+    }
+
+    synchronized void clearEvidence()
+    {
+        evidenceByName.clear();
+    }
+
+    synchronized void suppressName(String displayName)
+    {
+        String normalizedName = normalizeName(displayName);
+        if (!normalizedName.isEmpty())
+        {
+            suppressedNames.add(normalizedName);
+            evidenceByName.remove(normalizedName);
+        }
+    }
+
+    synchronized void suppressNames(Set<String> normalizedNames)
+    {
+        for (String normalizedName : normalizedNames)
+        {
+            if (!normalizedName.isEmpty())
+            {
+                suppressedNames.add(normalizedName);
+                evidenceByName.remove(normalizedName);
+            }
+        }
+    }
+
+    synchronized void unsuppressNames(Set<String> normalizedNames)
+    {
+        suppressedNames.removeAll(normalizedNames);
+    }
+
+    synchronized boolean isSuppressed(String displayName)
+    {
+        return suppressedNames.contains(normalizeName(displayName));
+    }
+
+    synchronized String getDisplayName(String normalizedName)
+    {
+        PlayerEvidence evidence = evidenceByName.get(normalizeName(normalizedName));
+        return evidence == null ? normalizedName : evidence.getDisplayName();
     }
 
     synchronized String updatePlayer(
@@ -31,6 +76,11 @@ final class DetectorService
         if (normalizedName.isEmpty())
         {
             return "";
+        }
+        if (suppressedNames.contains(normalizedName))
+        {
+            evidenceByName.remove(normalizedName);
+            return normalizedName;
         }
 
         PlayerEvidence evidence = evidenceByName.computeIfAbsent(
@@ -52,6 +102,11 @@ final class DetectorService
         String normalizedName = normalizeName(displayName);
         if (normalizedName.isEmpty())
         {
+            return false;
+        }
+        if (suppressedNames.contains(normalizedName))
+        {
+            evidenceByName.remove(normalizedName);
             return false;
         }
 
@@ -98,7 +153,7 @@ final class DetectorService
         }
 
         PlayerEvidence evidence = evidenceByName.get(normalizedName);
-        if (evidence == null || evidence.isHiscoreLookupInFlight())
+        if (evidence == null || suppressedNames.contains(normalizedName) || evidence.isHiscoreLookupInFlight())
         {
             return false;
         }
@@ -146,7 +201,7 @@ final class DetectorService
         for (PlayerEvidence evidence : evidenceByName.values())
         {
             SuspicionResult result = evidence.getLastResult();
-            if (result != null && result.isSuspicious())
+            if (result != null && result.isSuspicious() && !suppressedNames.contains(result.getNormalizedName()))
             {
                 results.add(result);
             }
@@ -172,8 +227,15 @@ final class DetectorService
     {
         PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));
         return evidence != null
+            && !suppressedNames.contains(evidence.getNormalizedName())
             && evidence.getLastResult() != null
             && evidence.getLastResult().isSuspicious();
+    }
+
+    synchronized String findSuspiciousNameFromTarget(String target)
+    {
+        Set<String> suspiciousNames = getSuspiciousNames();
+        return MenuHighlighter.findMatchingSuspiciousName(target, suspiciousNames);
     }
 
     static String normalizeName(String name)
@@ -201,6 +263,9 @@ final class DetectorService
         boolean behaviorMatch = castCount >= config.getCastThreshold();
         HiscoreProfile hiscoreProfile = evidence.getHiscoreProfile();
         boolean magicDominant = config.isEnableHiscoreScoring() && hiscoreProfile.isMagicDominant();
+        boolean highMagic = config.isEnableHiscoreScoring()
+            && config.isEnableMaxMagicScoring()
+            && hiscoreProfile.isAtLeastMagicLevel(config.getMaxMagicLevelThreshold());
         boolean consistentCadence = behaviorMatch && evidence.hasConsistentCadence(
             nowMillis,
             config.getObservationWindowMillis(),
@@ -222,9 +287,21 @@ final class DetectorService
             score += DetectorConfigSnapshot.HISCORE_SCORE;
         }
 
+        if (highMagic)
+        {
+            score += config.getMaxMagicScore();
+        }
+
         if (consistentCadence)
         {
             score += DetectorConfigSnapshot.CADENCE_SCORE;
+        }
+
+        boolean matureAccountSuppressed = config.isEnableMatureAccountSuppression()
+            && hiscoreProfile.isMatureAccount(config.getNonMagicTotalLevelSuppressionThreshold());
+        if (matureAccountSuppressed)
+        {
+            score = Math.max(0, score - config.getMatureAccountScorePenalty());
         }
 
         boolean staffGatePassed = !config.isRequireFireStaff() || staffMatch;
@@ -239,9 +316,12 @@ final class DetectorService
             staffMatch,
             behaviorMatch,
             magicDominant,
+            highMagic,
             consistentCadence,
             hiscoreProfile.getMagicLevel(),
             hiscoreProfile.getNonMagicSkillsAboveThreshold(),
+            hiscoreProfile.getNonMagicTotalLevel(),
+            matureAccountSuppressed,
             hiscoreProfile.getStatusLabel(),
             evidence.getWorld(),
             evidence.getDistance(),

@@ -1,6 +1,7 @@
 package com.detectautoalchers;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
@@ -16,6 +17,7 @@ public class MenuHighlighterTest
 
         assertTrue(MenuHighlighter.shouldHighlightTarget("<col=ffffff>Auto Bot<col=ffff00> (level-3)", suspects));
         assertFalse(MenuHighlighter.shouldHighlightTarget("<col=ffffff>Auto Bottle<col=ffff00> (level-3)", suspects));
+        assertEquals("auto bot", MenuHighlighter.findMatchingSuspiciousName("<col=ffffff>Auto Bot<col=ffff00> (level-3)", suspects));
     }
 
     @Test

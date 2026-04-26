@@ -20,6 +20,12 @@ final class DetectorConfigSnapshot
     private final int magicLevelThreshold;
     private final int nonMagicSkillThreshold;
     private final int allowedNonMagicSkillsAboveThreshold;
+    private final boolean enableMaxMagicScoring;
+    private final int maxMagicLevelThreshold;
+    private final int maxMagicScore;
+    private final boolean enableMatureAccountSuppression;
+    private final int nonMagicTotalLevelSuppressionThreshold;
+    private final int matureAccountScorePenalty;
     private final long hiscoreCooldownMillis;
     private final Set<Integer> alchemyAnimationIds;
     private final Set<Integer> alchemySpotAnimationIds;
@@ -37,6 +43,12 @@ final class DetectorConfigSnapshot
         int magicLevelThreshold,
         int nonMagicSkillThreshold,
         int allowedNonMagicSkillsAboveThreshold,
+        boolean enableMaxMagicScoring,
+        int maxMagicLevelThreshold,
+        int maxMagicScore,
+        boolean enableMatureAccountSuppression,
+        int nonMagicTotalLevelSuppressionThreshold,
+        int matureAccountScorePenalty,
         long hiscoreCooldownMillis,
         Set<Integer> alchemyAnimationIds,
         Set<Integer> alchemySpotAnimationIds,
@@ -53,6 +65,12 @@ final class DetectorConfigSnapshot
         this.magicLevelThreshold = magicLevelThreshold;
         this.nonMagicSkillThreshold = nonMagicSkillThreshold;
         this.allowedNonMagicSkillsAboveThreshold = allowedNonMagicSkillsAboveThreshold;
+        this.enableMaxMagicScoring = enableMaxMagicScoring;
+        this.maxMagicLevelThreshold = maxMagicLevelThreshold;
+        this.maxMagicScore = maxMagicScore;
+        this.enableMatureAccountSuppression = enableMatureAccountSuppression;
+        this.nonMagicTotalLevelSuppressionThreshold = nonMagicTotalLevelSuppressionThreshold;
+        this.matureAccountScorePenalty = matureAccountScorePenalty;
         this.hiscoreCooldownMillis = hiscoreCooldownMillis;
         this.alchemyAnimationIds = Collections.unmodifiableSet(alchemyAnimationIds);
         this.alchemySpotAnimationIds = Collections.unmodifiableSet(alchemySpotAnimationIds);
@@ -73,6 +91,12 @@ final class DetectorConfigSnapshot
             config.magicLevelThreshold(),
             config.nonMagicSkillThreshold(),
             config.allowedNonMagicSkillsAboveThreshold(),
+            config.enableMaxMagicScoring(),
+            config.maxMagicLevelThreshold(),
+            config.maxMagicScore(),
+            config.enableMatureAccountSuppression(),
+            config.nonMagicTotalLevelSuppressionThreshold(),
+            config.matureAccountScorePenalty(),
             config.hiscoreCooldownMinutes() * 60_000L,
             IdListParser.parse(config.alchemyAnimationIds()),
             IdListParser.parse(config.alchemySpotAnimationIds()),
@@ -94,6 +118,12 @@ final class DetectorConfigSnapshot
             21,
             10,
             2,
+            true,
+            99,
+            100,
+            true,
+            125,
+            100,
             15 * 60_000L,
             IdListParser.parse("713"),
             IdListParser.parse("112,113"),
@@ -150,6 +180,36 @@ final class DetectorConfigSnapshot
     int getAllowedNonMagicSkillsAboveThreshold()
     {
         return allowedNonMagicSkillsAboveThreshold;
+    }
+
+    boolean isEnableMaxMagicScoring()
+    {
+        return enableMaxMagicScoring;
+    }
+
+    int getMaxMagicLevelThreshold()
+    {
+        return maxMagicLevelThreshold;
+    }
+
+    int getMaxMagicScore()
+    {
+        return maxMagicScore;
+    }
+
+    boolean isEnableMatureAccountSuppression()
+    {
+        return enableMatureAccountSuppression;
+    }
+
+    int getNonMagicTotalLevelSuppressionThreshold()
+    {
+        return nonMagicTotalLevelSuppressionThreshold;
+    }
+
+    int getMatureAccountScorePenalty()
+    {
+        return matureAccountScorePenalty;
     }
 
     long getHiscoreCooldownMillis()

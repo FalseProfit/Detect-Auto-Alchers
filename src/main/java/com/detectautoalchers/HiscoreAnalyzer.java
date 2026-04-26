@@ -26,6 +26,7 @@ final class HiscoreAnalyzer
         Skill magic = result.getSkill(HiscoreSkill.MAGIC);
         int magicLevel = level(magic);
         int nonMagicHighSkills = 0;
+        int nonMagicTotalLevel = 0;
 
         for (Map.Entry<HiscoreSkill, Skill> entry : result.getSkills().entrySet())
         {
@@ -35,7 +36,9 @@ final class HiscoreAnalyzer
                 continue;
             }
 
-            if (level(entry.getValue()) > nonMagicSkillThreshold)
+            int level = level(entry.getValue());
+            nonMagicTotalLevel += level;
+            if (level > nonMagicSkillThreshold)
             {
                 nonMagicHighSkills++;
             }
@@ -43,7 +46,7 @@ final class HiscoreAnalyzer
 
         boolean magicDominant = magicLevel >= magicLevelThreshold
             && nonMagicHighSkills <= allowedNonMagicSkillsAboveThreshold;
-        return HiscoreProfile.found(magicLevel, nonMagicHighSkills, magicDominant);
+        return HiscoreProfile.found(magicLevel, nonMagicHighSkills, nonMagicTotalLevel, magicDominant);
     }
 
     private static int level(Skill skill)

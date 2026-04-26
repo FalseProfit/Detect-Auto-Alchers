@@ -1,5 +1,6 @@
 package com.detectautoalchers;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -126,10 +127,80 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "enableMaxMagicScoring",
+        name = "99 Magic scoring",
+        description = "Add evidence for accounts still alching at or above the configured Magic level",
+        position = 10
+    )
+    default boolean enableMaxMagicScoring()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "maxMagicLevelThreshold",
+        name = "High Magic threshold",
+        description = "Magic level at or above which high-Magic scoring applies",
+        position = 11
+    )
+    @Range(min = 1, max = 99)
+    default int maxMagicLevelThreshold()
+    {
+        return 99;
+    }
+
+    @ConfigItem(
+        keyName = "maxMagicScore",
+        name = "High Magic score",
+        description = "Evidence score added for accounts at or above the high-Magic threshold",
+        position = 12
+    )
+    @Range(min = 0, max = 200)
+    default int maxMagicScore()
+    {
+        return 100;
+    }
+
+    @ConfigItem(
+        keyName = "enableMatureAccountSuppression",
+        name = "Mature account suppression",
+        description = "Reduce score for accounts with many non-Magic levels",
+        position = 13
+    )
+    default boolean enableMatureAccountSuppression()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "nonMagicTotalLevelSuppressionThreshold",
+        name = "Non-Magic total threshold",
+        description = "Non-Magic total level at or above this value receives the mature-account score penalty",
+        position = 14
+    )
+    @Range(min = 1, max = 2268)
+    default int nonMagicTotalLevelSuppressionThreshold()
+    {
+        return 125;
+    }
+
+    @ConfigItem(
+        keyName = "matureAccountScorePenalty",
+        name = "Mature account penalty",
+        description = "Score penalty applied to mature accounts",
+        position = 15
+    )
+    @Range(min = 0, max = 500)
+    default int matureAccountScorePenalty()
+    {
+        return 100;
+    }
+
+    @ConfigItem(
         keyName = "hiscoreCooldownMinutes",
         name = "Hiscore cooldown",
         description = "Minutes before retrying a failed or missing hiscore lookup",
-        position = 10
+        position = 16
     )
     @Range(min = 1, max = 120)
     default int hiscoreCooldownMinutes()
@@ -141,7 +212,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "alchemyAnimationIds",
         name = "Alchemy animation IDs",
         description = "Comma-separated animation IDs treated as alchemy-like",
-        position = 11
+        position = 17
     )
     default String alchemyAnimationIds()
     {
@@ -152,7 +223,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "alchemySpotAnimationIds",
         name = "Alchemy spotanim IDs",
         description = "Comma-separated spot-animation IDs treated as alchemy-like",
-        position = 12
+        position = 18
     )
     default String alchemySpotAnimationIds()
     {
@@ -163,7 +234,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "showOverlay",
         name = "Show overlay",
         description = "Draw red outlines around highlighted suspects",
-        position = 13
+        position = 19
     )
     default boolean showOverlay()
     {
@@ -174,10 +245,43 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "colorMenuEntries",
         name = "Color menu entries",
         description = "Color suspect player menu entries red",
-        position = 14
+        position = 20
     )
     default boolean colorMenuEntries()
     {
         return true;
+    }
+
+    @ConfigItem(
+        keyName = "persistReportedPlayers",
+        name = "Persist reported players",
+        description = "Save reported players locally so they are not suggested again after restart",
+        position = 21
+    )
+    default boolean persistReportedPlayers()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "highlightReportedPlayers",
+        name = "Highlight reported players",
+        description = "Draw a separate outline around players already in local report history",
+        position = 22
+    )
+    default boolean highlightReportedPlayers()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+        keyName = "reportedPlayerHighlightColor",
+        name = "Reported highlight color",
+        description = "Outline color for players already in local report history",
+        position = 23
+    )
+    default Color reportedPlayerHighlightColor()
+    {
+        return new Color(144, 238, 144);
     }
 }

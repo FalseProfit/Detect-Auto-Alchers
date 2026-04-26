@@ -6,12 +6,18 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.Ignore;
+import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.WorldView;
@@ -20,6 +26,7 @@ import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOpened;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -30,6 +37,8 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @PluginDescriptor(
     name = "Detect Auto Alchers",
@@ -38,6 +47,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class DetectAutoAlchersPlugin extends Plugin
 {
+    private static final Logger log = LoggerFactory.getLogger(DetectAutoAlchersPlugin.class);
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
 
@@ -62,6 +72,9 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Inject
     private DetectorService detectorService;
 
+    @Inject
+    private ReportedPlayerStore reportedPlayerStore;
+
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
 
@@ -78,13 +91,21 @@ public class DetectAutoAlchersPlugin extends Plugin
         return new DetectorService();
     }
 
+    @Provides
+    @Singleton
+    ReportedPlayerStore provideReportedPlayerStore()
+    {
+        return ReportedPlayerStore.createDefault();
+    }
+
     @Override
     protected void startUp()
     {
         detectorService.clear();
+        loadReportedPlayers();
         overlayManager.add(overlay);
 
-        panel = new DetectAutoAlchersPanel();
+        panel = new DetectAutoAlchersPanel(this::clearReportedHistory);
         navButton = NavigationButton.builder()
             .tooltip("Detect Auto Alchers")
             .icon(createIcon())
@@ -114,7 +135,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         GameState state = event.getGameState();
         if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
         {
-            detectorService.clear();
+            detectorService.clearEvidence();
             refreshPanel(System.currentTimeMillis());
         }
     }
@@ -125,6 +146,11 @@ public class DetectAutoAlchersPlugin extends Plugin
         Actor actor = event.getActor();
         if (!(actor instanceof Player) || actor.getName() == null)
         {
+            return;
+        }
+        if (isIgnoredPlayer(actor.getName()))
+        {
+            detectorService.suppressName(actor.getName());
             return;
         }
 
@@ -174,6 +200,12 @@ public class DetectAutoAlchersPlugin extends Plugin
                 continue;
             }
 
+            if (isIgnoredPlayer(player.getName()))
+            {
+                detectorService.suppressName(player.getName());
+                continue;
+            }
+
             int distance = player.getWorldLocation().distanceTo(localLocation);
             String normalizedName = detectorService.updatePlayer(
                 player.getName(),
@@ -187,6 +219,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             requestHiscoreIfNeeded(player.getName(), normalizedName, snapshot, nowMillis);
         }
 
+        detectorService.suppressNames(getIgnoredNames());
         detectorService.pruneStale(nowMillis, snapshot.getObservationWindowMillis());
         detectorService.recompute(snapshot, nowMillis);
         refreshPanel(nowMillis);
@@ -202,6 +235,23 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         MenuHighlighter.highlight(event.getMenuEntries(), detectorService.getSuspiciousNames());
+    }
+
+    @Subscribe
+    public void onMenuOptionClicked(MenuOptionClicked event)
+    {
+        if (!"report".equalsIgnoreCase(MenuHighlighter.cleanText(event.getMenuOption())))
+        {
+            return;
+        }
+
+        String normalizedName = detectorService.findSuspiciousNameFromTarget(event.getMenuTarget());
+        if (!normalizedName.isEmpty())
+        {
+            recordReportedPlayer(normalizedName, detectorService.getDisplayName(normalizedName));
+            detectorService.suppressName(normalizedName);
+            refreshPanel(System.currentTimeMillis());
+        }
     }
 
     private boolean shouldTrack(Player player, Player localPlayer, WorldPoint localLocation, int radius)
@@ -229,6 +279,82 @@ public class DetectAutoAlchersPlugin extends Plugin
     {
         PlayerComposition composition = player.getPlayerComposition();
         return composition == null ? -1 : composition.getEquipmentId(KitType.WEAPON);
+    }
+
+    private boolean isIgnoredPlayer(String name)
+    {
+        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
+        return ignoreContainer != null && ignoreContainer.findByName(name) != null;
+    }
+
+    private Set<String> getIgnoredNames()
+    {
+        Set<String> ignoredNames = new HashSet<>();
+        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
+        if (ignoreContainer == null)
+        {
+            return ignoredNames;
+        }
+
+        for (Ignore ignore : ignoreContainer.getMembers())
+        {
+            if (ignore != null)
+            {
+                ignoredNames.add(DetectorService.normalizeName(ignore.getName()));
+            }
+        }
+
+        return ignoredNames;
+    }
+
+    private void loadReportedPlayers()
+    {
+        if (!config.persistReportedPlayers())
+        {
+            return;
+        }
+
+        try
+        {
+            reportedPlayerStore.load();
+            detectorService.suppressNames(reportedPlayerStore.getNormalizedNames());
+        }
+        catch (IOException ex)
+        {
+            log.warn("Unable to load reported player history from {}", reportedPlayerStore.getPath(), ex);
+        }
+    }
+
+    private void recordReportedPlayer(String normalizedName, String displayName)
+    {
+        if (!config.persistReportedPlayers())
+        {
+            return;
+        }
+
+        try
+        {
+            reportedPlayerStore.record(normalizedName, displayName, Instant.now());
+        }
+        catch (IOException ex)
+        {
+            log.warn("Unable to save reported player history to {}", reportedPlayerStore.getPath(), ex);
+        }
+    }
+
+    private void clearReportedHistory()
+    {
+        Set<String> reportedNames = reportedPlayerStore.getNormalizedNames();
+        try
+        {
+            reportedPlayerStore.clear();
+            detectorService.unsuppressNames(reportedNames);
+            refreshPanel(System.currentTimeMillis());
+        }
+        catch (IOException ex)
+        {
+            log.warn("Unable to clear reported player history at {}", reportedPlayerStore.getPath(), ex);
+        }
     }
 
     private void scanSpotAnimations(Player player, DetectorConfigSnapshot snapshot, long nowMillis)

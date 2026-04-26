@@ -24,8 +24,19 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Staff requirement: enabled
 - Broad fire-rune staff matching: disabled
 - Hiscore scoring: enabled
+- High-Magic scoring: enabled for Magic level 99
+- Non-Magic mature-account threshold: 125
+- Persistent reported-player history: enabled
 
 The animation and spot-animation ID lists are configurable. The defaults are seeded for Low/High Alchemy-style observations and should be validated in a RuneLite developer client.
+
+Reported players are saved locally at:
+
+```text
+~/.runelite/detect-auto-alchers/reported-players.csv
+```
+
+The CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players are suppressed from future red suspect highlighting and can optionally be outlined with a separate configurable reported-player color.
 
 ## Development
 

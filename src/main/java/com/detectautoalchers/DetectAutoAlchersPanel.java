@@ -4,12 +4,12 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.GridLayout;
 import java.time.Duration;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -26,10 +26,17 @@ final class DetectAutoAlchersPanel extends PluginPanel
     private static final Color MUTED = new Color(170, 170, 170);
 
     private final JPanel content = new JPanel();
+    private final Runnable clearReportedHistory;
 
     DetectAutoAlchersPanel()
     {
+        this(null);
+    }
+
+    DetectAutoAlchersPanel(Runnable clearReportedHistory)
+    {
         super(false);
+        this.clearReportedHistory = clearReportedHistory;
         setLayout(new BorderLayout());
         setBackground(BACKGROUND);
 
@@ -55,6 +62,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
         content.removeAll();
         addHeader("Suspected auto-alchers");
+        addClearReportedHistoryButton();
         if (suspects.isEmpty())
         {
             addMuted("No suspects in range.");
@@ -64,7 +72,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
             for (SuspicionResult suspect : suspects)
             {
                 addSuspect(suspect, nowMillis);
-                content.add(Box.createRigidArea(new Dimension(0, 8)));
+                content.add(Box.createRigidArea(new Dimension(0, 6)));
             }
         }
 
@@ -76,6 +84,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
     {
         content.removeAll();
         addHeader("Suspected auto-alchers");
+        addClearReportedHistoryButton();
         addMuted("No suspects in range.");
     }
 
@@ -87,6 +96,20 @@ final class DetectAutoAlchersPanel extends PluginPanel
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         label.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         content.add(label);
+    }
+
+    private void addClearReportedHistoryButton()
+    {
+        if (clearReportedHistory == null)
+        {
+            return;
+        }
+
+        JButton button = new JButton("Clear reported history");
+        button.setAlignmentX(Component.LEFT_ALIGNMENT);
+        button.addActionListener(event -> clearReportedHistory.run());
+        content.add(button);
+        content.add(Box.createRigidArea(new Dimension(0, 8)));
     }
 
     private void addMuted(String text)
@@ -104,26 +127,35 @@ final class DetectAutoAlchersPanel extends PluginPanel
         row.setBackground(ROW_BACKGROUND);
         row.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(ALERT.darker()),
-            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+            BorderFactory.createEmptyBorder(6, 8, 6, 8)
         ));
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel name = new JLabel(suspect.getDisplayName() + "  [" + suspect.getScore() + "]");
+        JLabel name = new JLabel(suspect.getDisplayName());
         name.setForeground(ALERT);
+        name.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.add(name);
+        row.add(Box.createRigidArea(new Dimension(0, 4)));
 
-        JPanel details = new JPanel(new GridLayout(0, 1, 0, 2));
+        JPanel details = new JPanel();
+        details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
         details.setOpaque(false);
+        details.setAlignmentX(Component.LEFT_ALIGNMENT);
+        addDetail(details, "score: " + suspect.getScore());
         addDetail(details, "casts: " + suspect.getCastCount());
-        addDetail(details, "staff: " + yesNo(suspect.isStaffMatch()) + "  weapon: " + suspect.getWeaponId());
-        addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel())
-            + "  other>threshold: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
-        addDetail(details, "hiscore: " + suspect.getHiscoreStatus()
-            + "  cadence: " + yesNo(suspect.isConsistentCadence()));
-        addDetail(details, "world: " + suspect.getWorld()
-            + "  distance: " + suspect.getDistance()
-            + "  seen: " + secondsSince(suspect.getLastSeenMillis(), nowMillis) + "s");
+        addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel()));
+        addDetail(details, "non-magic total: " + formatCount(suspect.getNonMagicTotalLevel()));
+        addDetail(details, "other skills: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
+        addDetail(details, "staff: " + yesNo(suspect.isStaffMatch()));
+        addDetail(details, "cadence: " + yesNo(suspect.isConsistentCadence()));
+        addDetail(details, "high magic: " + yesNo(suspect.isHighMagic()));
+        addDetail(details, "mature: " + yesNo(suspect.isMatureAccountSuppressed()));
+        addDetail(details, "world: " + suspect.getWorld());
+        addDetail(details, "distance: " + suspect.getDistance());
+        addDetail(details, "seen: " + secondsSince(suspect.getLastSeenMillis(), nowMillis) + "s");
+        details.setMaximumSize(new Dimension(Integer.MAX_VALUE, details.getPreferredSize().height));
         row.add(details);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
 
         content.add(row);
     }
@@ -132,6 +164,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
     {
         JLabel label = new JLabel(text);
         label.setForeground(MUTED);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(label);
     }
 

@@ -7,6 +7,8 @@ import java.awt.Graphics2D;
 import java.awt.Shape;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.Ignore;
+import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
 import net.runelite.client.ui.overlay.Overlay;
@@ -20,6 +22,7 @@ final class DetectAutoAlchersOverlay extends Overlay
 
     private final Client client;
     private final DetectorService detectorService;
+    private final ReportedPlayerStore reportedPlayerStore;
     private final DetectAutoAlchersConfig config;
     private final ModelOutlineRenderer modelOutlineRenderer;
 
@@ -27,11 +30,13 @@ final class DetectAutoAlchersOverlay extends Overlay
     DetectAutoAlchersOverlay(
         Client client,
         DetectorService detectorService,
+        ReportedPlayerStore reportedPlayerStore,
         DetectAutoAlchersConfig config,
         ModelOutlineRenderer modelOutlineRenderer)
     {
         this.client = client;
         this.detectorService = detectorService;
+        this.reportedPlayerStore = reportedPlayerStore;
         this.config = config;
         this.modelOutlineRenderer = modelOutlineRenderer;
         setPosition(OverlayPosition.DYNAMIC);
@@ -54,22 +59,29 @@ final class DetectAutoAlchersOverlay extends Overlay
 
         for (Player player : worldView.players())
         {
-            if (player == null || player.getName() == null || !detectorService.isSuspicious(player.getName()))
+            if (player == null || player.getName() == null || isIgnoredPlayer(player.getName()))
             {
                 continue;
             }
 
-            drawPlayer(graphics, player);
+            if (config.highlightReportedPlayers() && reportedPlayerStore.contains(player.getName()))
+            {
+                drawPlayer(graphics, player, config.reportedPlayerHighlightColor());
+            }
+            else if (detectorService.isSuspicious(player.getName()))
+            {
+                drawPlayer(graphics, player, OUTLINE_COLOR);
+            }
         }
 
         return null;
     }
 
-    private void drawPlayer(Graphics2D graphics, Player player)
+    private void drawPlayer(Graphics2D graphics, Player player, Color color)
     {
         try
         {
-            modelOutlineRenderer.drawOutline(player, 2, OUTLINE_COLOR, 3);
+            modelOutlineRenderer.drawOutline(player, 2, color, 3);
             return;
         }
         catch (RuntimeException ignored)
@@ -85,9 +97,15 @@ final class DetectAutoAlchersOverlay extends Overlay
 
         if (hull != null)
         {
-            graphics.setColor(OUTLINE_COLOR);
+            graphics.setColor(color);
             graphics.setStroke(new BasicStroke(2));
             graphics.draw(hull);
         }
+    }
+
+    private boolean isIgnoredPlayer(String name)
+    {
+        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
+        return ignoreContainer != null && ignoreContainer.findByName(name) != null;
     }
 }

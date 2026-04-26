@@ -11,21 +11,28 @@ final class HiscoreProfile
         ERROR
     }
 
-    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, false);
-    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, false);
-    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, false);
-    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, false);
+    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, -1, false);
+    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, -1, false);
+    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, -1, false);
+    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, -1, false);
 
     private final Status status;
     private final int magicLevel;
     private final int nonMagicSkillsAboveThreshold;
+    private final int nonMagicTotalLevel;
     private final boolean magicDominant;
 
-    private HiscoreProfile(Status status, int magicLevel, int nonMagicSkillsAboveThreshold, boolean magicDominant)
+    private HiscoreProfile(
+        Status status,
+        int magicLevel,
+        int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        boolean magicDominant)
     {
         this.status = status;
         this.magicLevel = magicLevel;
         this.nonMagicSkillsAboveThreshold = nonMagicSkillsAboveThreshold;
+        this.nonMagicTotalLevel = nonMagicTotalLevel;
         this.magicDominant = magicDominant;
     }
 
@@ -51,7 +58,22 @@ final class HiscoreProfile
 
     static HiscoreProfile found(int magicLevel, int nonMagicSkillsAboveThreshold, boolean magicDominant)
     {
-        return new HiscoreProfile(Status.FOUND, magicLevel, nonMagicSkillsAboveThreshold, magicDominant);
+        return found(magicLevel, nonMagicSkillsAboveThreshold, -1, magicDominant);
+    }
+
+    static HiscoreProfile found(
+        int magicLevel,
+        int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        boolean magicDominant)
+    {
+        return new HiscoreProfile(
+            Status.FOUND,
+            magicLevel,
+            nonMagicSkillsAboveThreshold,
+            nonMagicTotalLevel,
+            magicDominant
+        );
     }
 
     Status getStatus()
@@ -67,6 +89,21 @@ final class HiscoreProfile
     int getNonMagicSkillsAboveThreshold()
     {
         return nonMagicSkillsAboveThreshold;
+    }
+
+    int getNonMagicTotalLevel()
+    {
+        return nonMagicTotalLevel;
+    }
+
+    boolean isMatureAccount(int nonMagicTotalLevelThreshold)
+    {
+        return status == Status.FOUND && nonMagicTotalLevel >= nonMagicTotalLevelThreshold;
+    }
+
+    boolean isAtLeastMagicLevel(int threshold)
+    {
+        return status == Status.FOUND && magicLevel >= threshold;
     }
 
     boolean isMagicDominant()

@@ -33,6 +33,108 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void matureAccountPenaltyDropsScoreBelowThreshold()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Played Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation("Played Alcher", "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 125, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+    }
+
+    @Test
+    public void matureAccountBelowThresholdStillFlags()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Almost Mature", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation("Almost Mature", "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 124, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertEquals(1, service.getSuspiciousResults().size());
+    }
+
+    @Test
+    public void highMagicAddsScoreAndCanCounterMaturePenalty()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Maxed Magic", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation("Maxed Magic", "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+        service.applyHiscore(name, HiscoreProfile.found(99, 2, 125, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertTrue(suspects.get(0).isHighMagic());
+        assertTrue(suspects.get(0).isMatureAccountSuppressed());
+        assertEquals(120, suspects.get(0).getScore());
+    }
+
+    @Test
+    public void suppressedNamesAreExcludedFromResults()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Reported Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation("Reported Alcher", "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, 40, true));
+        service.recompute(config, now + 3_000L);
+        assertEquals(1, service.getSuspiciousResults().size());
+
+        service.suppressName("Reported Alcher");
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Reported Alcher"));
+        assertFalse(service.recordAlchObservation("Reported Alcher", "animation", 713, 200, now + 4_000L, config));
+    }
+
+    @Test
+    public void findsSuspiciousNameFromMenuTarget()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Menu Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation("Menu Alcher", "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, 40, true));
+        service.recompute(config, now + 3_000L);
+
+        assertEquals("menu alcher", service.findSuspiciousNameFromTarget("<col=ffffff>Menu Alcher<col=ffff00> (level-3)"));
+    }
+
+    @Test
     public void doesNotFlagWithoutRequiredStaff()
     {
         DetectorService service = new DetectorService();

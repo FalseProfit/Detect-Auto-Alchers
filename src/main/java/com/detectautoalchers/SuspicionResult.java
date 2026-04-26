@@ -10,9 +10,12 @@ final class SuspicionResult
     private final boolean staffMatch;
     private final boolean behaviorMatch;
     private final boolean magicDominant;
+    private final boolean highMagic;
     private final boolean consistentCadence;
     private final int magicLevel;
     private final int nonMagicSkillsAboveThreshold;
+    private final int nonMagicTotalLevel;
+    private final boolean matureAccountSuppressed;
     private final String hiscoreStatus;
     private final int world;
     private final int distance;
@@ -28,9 +31,12 @@ final class SuspicionResult
         boolean staffMatch,
         boolean behaviorMatch,
         boolean magicDominant,
+        boolean highMagic,
         boolean consistentCadence,
         int magicLevel,
         int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        boolean matureAccountSuppressed,
         String hiscoreStatus,
         int world,
         int distance,
@@ -45,9 +51,12 @@ final class SuspicionResult
         this.staffMatch = staffMatch;
         this.behaviorMatch = behaviorMatch;
         this.magicDominant = magicDominant;
+        this.highMagic = highMagic;
         this.consistentCadence = consistentCadence;
         this.magicLevel = magicLevel;
         this.nonMagicSkillsAboveThreshold = nonMagicSkillsAboveThreshold;
+        this.nonMagicTotalLevel = nonMagicTotalLevel;
+        this.matureAccountSuppressed = matureAccountSuppressed;
         this.hiscoreStatus = hiscoreStatus;
         this.world = world;
         this.distance = distance;
@@ -95,6 +104,11 @@ final class SuspicionResult
         return magicDominant;
     }
 
+    boolean isHighMagic()
+    {
+        return highMagic;
+    }
+
     boolean isConsistentCadence()
     {
         return consistentCadence;
@@ -108,6 +122,16 @@ final class SuspicionResult
     int getNonMagicSkillsAboveThreshold()
     {
         return nonMagicSkillsAboveThreshold;
+    }
+
+    int getNonMagicTotalLevel()
+    {
+        return nonMagicTotalLevel;
+    }
+
+    boolean isMatureAccountSuppressed()
+    {
+        return matureAccountSuppressed;
     }
 
     String getHiscoreStatus()

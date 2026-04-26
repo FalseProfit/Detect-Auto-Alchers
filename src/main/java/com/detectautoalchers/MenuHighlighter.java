@@ -29,15 +29,20 @@ final class MenuHighlighter
                 continue;
             }
 
-            entry.setTarget(colorText(cleanTarget(entry.getTarget())));
+            entry.setTarget(colorText(cleanText(entry.getTarget())));
             if (isReportOption(entry.getOption()))
             {
-                entry.setOption(colorText(cleanTarget(entry.getOption())));
+                entry.setOption(colorText(cleanText(entry.getOption())));
             }
         }
     }
 
     static boolean shouldHighlightTarget(String target, Set<String> suspiciousNames)
+    {
+        return !findMatchingSuspiciousName(target, suspiciousNames).isEmpty();
+    }
+
+    static String findMatchingSuspiciousName(String target, Set<String> suspiciousNames)
     {
         String normalizedTarget = DetectorService.normalizeName(Text.removeTags(target == null ? "" : target));
         for (String suspiciousName : suspiciousNames)
@@ -46,10 +51,10 @@ final class MenuHighlighter
                 || normalizedTarget.startsWith(suspiciousName + " ")
                 || normalizedTarget.startsWith(suspiciousName + " ("))
             {
-                return true;
+                return suspiciousName;
             }
         }
-        return false;
+        return "";
     }
 
     static String colorText(String text)
@@ -73,7 +78,7 @@ final class MenuHighlighter
         return "report".equalsIgnoreCase(Text.removeTags(option == null ? "" : option).trim());
     }
 
-    private static String cleanTarget(String target)
+    static String cleanText(String target)
     {
         return Text.removeTags(target == null ? "" : target);
     }
