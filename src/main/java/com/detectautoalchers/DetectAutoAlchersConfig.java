@@ -317,7 +317,7 @@ public interface DetectAutoAlchersConfig extends Config
     @Range(min = 1, max = 2268)
     default int nonMagicTotalLevelSuppressionThreshold()
     {
-        return 125;
+        return 150;
     }
 
     @ConfigItem(
