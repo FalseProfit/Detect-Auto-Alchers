@@ -246,7 +246,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "nonMagicSkillThreshold",
         name = "Other skill threshold",
-        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection i.e. training crafting and fletching to 60, plus training magic, but everything else untouched. This controls what level of non-Magic skills can be ignored when calculating the Magic-dominant account rule and subsequent detection score. How many skills ignored is configurable below. Default: 50.",
+        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls what level of non-Magic skills can be ignored when calculating the Magic-dominant account rule and subsequent detection score.<br>How many skills ignored is configurable below. Default: 50.",
         position = 2,
         section = scoreIncreasesSection
     )
@@ -259,7 +259,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "allowedNonMagicSkillsAboveThreshold",
         name = "Allowed other skills",
-        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection i.e. training crafting and fletching to 60, plus training magic, but everything else untouched. This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule. Skill level configured above. Default: 2 skills.",
+        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule.<br>Skill level configured above. Default: 2 skills.",
         position = 3,
         section = scoreIncreasesSection
     )
