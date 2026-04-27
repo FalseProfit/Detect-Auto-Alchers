@@ -11,15 +11,17 @@ final class HiscoreProfile
         ERROR
     }
 
-    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, -1, false);
-    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, -1, false);
-    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, -1, false);
-    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, -1, false);
+    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, -1, -1, -1, false);
+    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, -1, -1, -1, false);
+    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, -1, -1, -1, false);
+    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, -1, -1, -1, false);
 
     private final Status status;
     private final int magicLevel;
     private final int nonMagicSkillsAboveThreshold;
     private final int nonMagicTotalLevel;
+    private final int clueScrollCompletions;
+    private final int collectionLogItems;
     private final boolean magicDominant;
 
     private HiscoreProfile(
@@ -27,12 +29,16 @@ final class HiscoreProfile
         int magicLevel,
         int nonMagicSkillsAboveThreshold,
         int nonMagicTotalLevel,
+        int clueScrollCompletions,
+        int collectionLogItems,
         boolean magicDominant)
     {
         this.status = status;
         this.magicLevel = magicLevel;
         this.nonMagicSkillsAboveThreshold = nonMagicSkillsAboveThreshold;
         this.nonMagicTotalLevel = nonMagicTotalLevel;
+        this.clueScrollCompletions = clueScrollCompletions;
+        this.collectionLogItems = collectionLogItems;
         this.magicDominant = magicDominant;
     }
 
@@ -67,11 +73,24 @@ final class HiscoreProfile
         int nonMagicTotalLevel,
         boolean magicDominant)
     {
+        return found(magicLevel, nonMagicSkillsAboveThreshold, nonMagicTotalLevel, 0, 0, magicDominant);
+    }
+
+    static HiscoreProfile found(
+        int magicLevel,
+        int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        int clueScrollCompletions,
+        int collectionLogItems,
+        boolean magicDominant)
+    {
         return new HiscoreProfile(
             Status.FOUND,
             magicLevel,
             nonMagicSkillsAboveThreshold,
             nonMagicTotalLevel,
+            clueScrollCompletions,
+            collectionLogItems,
             magicDominant
         );
     }
@@ -96,9 +115,34 @@ final class HiscoreProfile
         return nonMagicTotalLevel;
     }
 
+    int getClueScrollCompletions()
+    {
+        return clueScrollCompletions;
+    }
+
+    int getCollectionLogItems()
+    {
+        return collectionLogItems;
+    }
+
+    int getClueAndCollectionLogTotal()
+    {
+        if (status != Status.FOUND)
+        {
+            return -1;
+        }
+
+        return clueScrollCompletions + collectionLogItems;
+    }
+
     boolean isMatureAccount(int nonMagicTotalLevelThreshold)
     {
         return status == Status.FOUND && nonMagicTotalLevel >= nonMagicTotalLevelThreshold;
+    }
+
+    boolean hasClueOrCollectionLogActivity(int clueCollectionActivityThreshold)
+    {
+        return status == Status.FOUND && getClueAndCollectionLogTotal() > clueCollectionActivityThreshold;
     }
 
     boolean isAtLeastMagicLevel(int threshold)

@@ -32,6 +32,10 @@ tasks.withType(JavaCompile).configureEach {
     options.release.set(11)
 }
 
+tasks.named('jar') {
+    from('runelite-plugin.properties')
+}
+
 tasks.register('run', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = pluginMainClass
@@ -51,6 +55,7 @@ tasks.register('shadowJar', Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from sourceSets.main.output
     from sourceSets.test.output
+    from('runelite-plugin.properties')
     from {
         configurations.testRuntimeClasspath.collect { file ->
             file.isDirectory() ? file : zipTree(file)

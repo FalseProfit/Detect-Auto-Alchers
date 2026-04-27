@@ -146,10 +146,12 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel()));
         addDetail(details, "non-magic total: " + formatCount(suspect.getNonMagicTotalLevel()));
         addDetail(details, "other skills: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
+        addDetail(details, "clues + collection log: " + formatCount(suspect.getClueAndCollectionLogTotal()));
         addDetail(details, "staff: " + yesNo(suspect.isStaffMatch()));
         addDetail(details, "cadence: " + yesNo(suspect.isConsistentCadence()));
         addDetail(details, "high magic: " + yesNo(suspect.isHighMagic()));
-        addDetail(details, "mature: " + yesNo(suspect.isMatureAccountSuppressed()));
+        addDetail(details, "non-magic reduction: " + yesNo(suspect.isMatureAccountSuppressed()));
+        addDetail(details, "played activity: " + yesNo(suspect.isClueCollectionActivitySuppressed()));
         addDetail(details, "world: " + suspect.getWorld());
         addDetail(details, "distance: " + suspect.getDistance());
         addDetail(details, "seen: " + secondsSince(suspect.getLastSeenMillis(), nowMillis) + "s");

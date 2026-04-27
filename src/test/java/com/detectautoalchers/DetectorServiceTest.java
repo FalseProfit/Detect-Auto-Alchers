@@ -71,6 +71,79 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void clueCollectionPenaltyDropsScoreBelowThreshold()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Clue Player", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Clue Player", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 40, 6, 0, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Clue Player"));
+    }
+
+    @Test
+    public void clueCollectionPenaltyStacksWithNonMagicTotalPenalty()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Played Max Mage", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Played Max Mage", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(99, 2, 125, 6, 0, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Played Max Mage"));
+    }
+
+    @Test
+    public void clueCollectionAtThresholdDoesNotPenalize()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Five Clues", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Five Clues", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 40, 3, 2, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertFalse(suspects.get(0).isClueCollectionActivitySuppressed());
+        assertEquals(120, suspects.get(0).getScore());
+    }
+
+    @Test
+    public void configuredClueCollectionThresholdAndPenaltyAffectScore()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithClueCollectionReduction(10, 40);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Custom Clues", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Custom Clues", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 40, 8, 3, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertTrue(suspects.get(0).isClueCollectionActivitySuppressed());
+        assertEquals(11, suspects.get(0).getClueAndCollectionLogTotal());
+        assertEquals(80, suspects.get(0).getScore());
+    }
+
+    @Test
     public void highMagicAddsScoreAndCanCounterMaturePenalty()
     {
         DetectorService service = new DetectorService();
@@ -192,5 +265,42 @@ public class DetectorServiceTest
         service.applyHiscore(name, HiscoreProfile.error());
         assertFalse(service.markHiscoreLookupIfNeeded(name, config, now + 2_000L));
         assertTrue(service.markHiscoreLookupIfNeeded(name, config, now + config.getHiscoreCooldownMillis() + 1L));
+    }
+
+    private void recordFiveAlchs(DetectorService service, String displayName, long now, DetectorConfigSnapshot config)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            service.recordAlchObservation(displayName, "animation", 713, 100 + (i * 5), now + (i * 600L), config);
+        }
+    }
+
+    private DetectorConfigSnapshot configWithClueCollectionReduction(int threshold, int penalty)
+    {
+        return new DetectorConfigSnapshot(
+            15,
+            60_000L,
+            5,
+            80,
+            true,
+            false,
+            true,
+            21,
+            10,
+            2,
+            true,
+            99,
+            100,
+            true,
+            125,
+            100,
+            threshold,
+            penalty,
+            15 * 60_000L,
+            IdListParser.parse("713"),
+            IdListParser.parse("112,113"),
+            true,
+            true
+        );
     }
 }

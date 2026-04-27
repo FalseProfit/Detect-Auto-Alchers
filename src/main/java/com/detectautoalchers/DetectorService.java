@@ -304,6 +304,14 @@ final class DetectorService
             score = Math.max(0, score - config.getMatureAccountScorePenalty());
         }
 
+        boolean clueCollectionActivitySuppressed = hiscoreProfile.hasClueOrCollectionLogActivity(
+            config.getClueCollectionActivityThreshold()
+        );
+        if (clueCollectionActivitySuppressed)
+        {
+            score = Math.max(0, score - config.getClueCollectionActivityScorePenalty());
+        }
+
         boolean staffGatePassed = !config.isRequireFireStaff() || staffMatch;
         boolean suspicious = staffGatePassed && score >= config.getSuspicionThreshold();
 
@@ -322,6 +330,10 @@ final class DetectorService
             hiscoreProfile.getNonMagicSkillsAboveThreshold(),
             hiscoreProfile.getNonMagicTotalLevel(),
             matureAccountSuppressed,
+            hiscoreProfile.getClueScrollCompletions(),
+            hiscoreProfile.getCollectionLogItems(),
+            hiscoreProfile.getClueAndCollectionLogTotal(),
+            clueCollectionActivitySuppressed,
             hiscoreProfile.getStatusLabel(),
             evidence.getWorld(),
             evidence.getDistance(),

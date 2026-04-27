@@ -16,6 +16,10 @@ final class SuspicionResult
     private final int nonMagicSkillsAboveThreshold;
     private final int nonMagicTotalLevel;
     private final boolean matureAccountSuppressed;
+    private final int clueScrollCompletions;
+    private final int collectionLogItems;
+    private final int clueAndCollectionLogTotal;
+    private final boolean clueCollectionActivitySuppressed;
     private final String hiscoreStatus;
     private final int world;
     private final int distance;
@@ -37,6 +41,10 @@ final class SuspicionResult
         int nonMagicSkillsAboveThreshold,
         int nonMagicTotalLevel,
         boolean matureAccountSuppressed,
+        int clueScrollCompletions,
+        int collectionLogItems,
+        int clueAndCollectionLogTotal,
+        boolean clueCollectionActivitySuppressed,
         String hiscoreStatus,
         int world,
         int distance,
@@ -57,6 +65,10 @@ final class SuspicionResult
         this.nonMagicSkillsAboveThreshold = nonMagicSkillsAboveThreshold;
         this.nonMagicTotalLevel = nonMagicTotalLevel;
         this.matureAccountSuppressed = matureAccountSuppressed;
+        this.clueScrollCompletions = clueScrollCompletions;
+        this.collectionLogItems = collectionLogItems;
+        this.clueAndCollectionLogTotal = clueAndCollectionLogTotal;
+        this.clueCollectionActivitySuppressed = clueCollectionActivitySuppressed;
         this.hiscoreStatus = hiscoreStatus;
         this.world = world;
         this.distance = distance;
@@ -132,6 +144,26 @@ final class SuspicionResult
     boolean isMatureAccountSuppressed()
     {
         return matureAccountSuppressed;
+    }
+
+    int getClueScrollCompletions()
+    {
+        return clueScrollCompletions;
+    }
+
+    int getCollectionLogItems()
+    {
+        return collectionLogItems;
+    }
+
+    int getClueAndCollectionLogTotal()
+    {
+        return clueAndCollectionLogTotal;
+    }
+
+    boolean isClueCollectionActivitySuppressed()
+    {
+        return clueCollectionActivitySuppressed;
     }
 
     String getHiscoreStatus()

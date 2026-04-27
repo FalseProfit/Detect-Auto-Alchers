@@ -46,11 +46,28 @@ final class HiscoreAnalyzer
 
         boolean magicDominant = magicLevel >= magicLevelThreshold
             && nonMagicHighSkills <= allowedNonMagicSkillsAboveThreshold;
-        return HiscoreProfile.found(magicLevel, nonMagicHighSkills, nonMagicTotalLevel, magicDominant);
+        return HiscoreProfile.found(
+            magicLevel,
+            nonMagicHighSkills,
+            nonMagicTotalLevel,
+            activityCount(result.getSkill(HiscoreSkill.CLUE_SCROLL_ALL)),
+            activityCount(result.getSkill(HiscoreSkill.COLLECTIONS_LOGGED)),
+            magicDominant
+        );
     }
 
     private static int level(Skill skill)
     {
         return skill == null ? 1 : skill.getLevel();
+    }
+
+    private static int activityCount(Skill skill)
+    {
+        if (skill == null || skill.getRank() < 0 || skill.getLevel() < 0)
+        {
+            return 0;
+        }
+
+        return skill.getLevel();
     }
 }

@@ -26,6 +26,8 @@ final class DetectorConfigSnapshot
     private final boolean enableMatureAccountSuppression;
     private final int nonMagicTotalLevelSuppressionThreshold;
     private final int matureAccountScorePenalty;
+    private final int clueCollectionActivityThreshold;
+    private final int clueCollectionActivityScorePenalty;
     private final long hiscoreCooldownMillis;
     private final Set<Integer> alchemyAnimationIds;
     private final Set<Integer> alchemySpotAnimationIds;
@@ -49,6 +51,8 @@ final class DetectorConfigSnapshot
         boolean enableMatureAccountSuppression,
         int nonMagicTotalLevelSuppressionThreshold,
         int matureAccountScorePenalty,
+        int clueCollectionActivityThreshold,
+        int clueCollectionActivityScorePenalty,
         long hiscoreCooldownMillis,
         Set<Integer> alchemyAnimationIds,
         Set<Integer> alchemySpotAnimationIds,
@@ -71,6 +75,8 @@ final class DetectorConfigSnapshot
         this.enableMatureAccountSuppression = enableMatureAccountSuppression;
         this.nonMagicTotalLevelSuppressionThreshold = nonMagicTotalLevelSuppressionThreshold;
         this.matureAccountScorePenalty = matureAccountScorePenalty;
+        this.clueCollectionActivityThreshold = clueCollectionActivityThreshold;
+        this.clueCollectionActivityScorePenalty = clueCollectionActivityScorePenalty;
         this.hiscoreCooldownMillis = hiscoreCooldownMillis;
         this.alchemyAnimationIds = Collections.unmodifiableSet(alchemyAnimationIds);
         this.alchemySpotAnimationIds = Collections.unmodifiableSet(alchemySpotAnimationIds);
@@ -97,6 +103,8 @@ final class DetectorConfigSnapshot
             config.enableMatureAccountSuppression(),
             config.nonMagicTotalLevelSuppressionThreshold(),
             config.matureAccountScorePenalty(),
+            config.clueCollectionActivityThreshold(),
+            config.clueCollectionActivityScorePenalty(),
             config.hiscoreCooldownMinutes() * 60_000L,
             IdListParser.parse(config.alchemyAnimationIds()),
             IdListParser.parse(config.alchemySpotAnimationIds()),
@@ -123,6 +131,8 @@ final class DetectorConfigSnapshot
             100,
             true,
             125,
+            100,
+            5,
             100,
             15 * 60_000L,
             IdListParser.parse("713"),
@@ -210,6 +220,16 @@ final class DetectorConfigSnapshot
     int getMatureAccountScorePenalty()
     {
         return matureAccountScorePenalty;
+    }
+
+    int getClueCollectionActivityThreshold()
+    {
+        return clueCollectionActivityThreshold;
+    }
+
+    int getClueCollectionActivityScorePenalty()
+    {
+        return clueCollectionActivityScorePenalty;
     }
 
     long getHiscoreCooldownMillis()
