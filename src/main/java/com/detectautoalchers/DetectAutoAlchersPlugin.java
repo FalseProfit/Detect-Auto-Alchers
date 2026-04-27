@@ -17,6 +17,7 @@ import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Ignore;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
@@ -30,6 +31,7 @@ import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.hiscore.HiscoreClient;
 import net.runelite.client.hiscore.HiscoreEndpoint;
 import net.runelite.client.plugins.Plugin;
@@ -77,6 +79,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
+    private final Set<String> mobilePlayerNames = new HashSet<>();
 
     @Provides
     DetectAutoAlchersConfig provideConfig(ConfigManager configManager)
@@ -101,6 +104,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Override
     protected void startUp()
     {
+        mobilePlayerNames.clear();
         detectorService.clear();
         loadReportedPlayers();
         overlayManager.add(overlay);
@@ -126,7 +130,27 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         panel = null;
+        mobilePlayerNames.clear();
         detectorService.clear();
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event)
+    {
+        if (!"detectautoalchers".equals(event.getGroup()) || !"ignoreMobilePlayers".equals(event.getKey()))
+        {
+            return;
+        }
+
+        if (config.ignoreMobilePlayers())
+        {
+            detectorService.suppressNames(mobilePlayerNames);
+        }
+        else
+        {
+            detectorService.unsuppressNames(getMobileOnlyNames());
+        }
+        refreshPanel(System.currentTimeMillis());
     }
 
     @Subscribe
@@ -148,13 +172,18 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             return;
         }
+        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        if (isObservedMobilePlayer(actor.getName(), snapshot))
+        {
+            detectorService.suppressName(actor.getName());
+            return;
+        }
         if (isIgnoredPlayer(actor.getName()))
         {
             detectorService.suppressName(actor.getName());
             return;
         }
 
-        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
         if (!snapshot.isAlchemyAnimation(actor.getAnimation()) || !isInRadius((Player) actor, snapshot.getRadius()))
         {
             return;
@@ -205,6 +234,11 @@ public class DetectAutoAlchersPlugin extends Plugin
                 detectorService.suppressName(player.getName());
                 continue;
             }
+            if (isObservedMobilePlayer(player.getName(), snapshot))
+            {
+                detectorService.suppressName(player.getName());
+                continue;
+            }
 
             int distance = player.getWorldLocation().distanceTo(localLocation);
             String normalizedName = detectorService.updatePlayer(
@@ -220,6 +254,10 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         detectorService.suppressNames(getIgnoredNames());
+        if (snapshot.isIgnoreMobilePlayers())
+        {
+            detectorService.suppressNames(mobilePlayerNames);
+        }
         detectorService.pruneStale(nowMillis, snapshot.getObservationWindowMillis());
         detectorService.recompute(snapshot, nowMillis);
         refreshPanel(nowMillis);
@@ -229,6 +267,11 @@ public class DetectAutoAlchersPlugin extends Plugin
     public void onMenuOpened(MenuOpened event)
     {
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(event.getMenuEntries()))
+        {
+            refreshPanel(System.currentTimeMillis());
+        }
+
         if (!snapshot.isColorMenuEntries())
         {
             return;
@@ -245,13 +288,32 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        String normalizedName = detectorService.findSuspiciousNameFromTarget(event.getMenuTarget());
+        if (config.ignoreMobilePlayers() && MenuHighlighter.hasMobileClientIcon(event.getMenuTarget()))
+        {
+            suppressMobilePlayer(getReportedPlayerName(event));
+            refreshPanel(System.currentTimeMillis());
+            return;
+        }
+
+        String displayName = getReportedPlayerName(event);
+        String normalizedName = DetectorService.normalizeName(displayName);
         if (!normalizedName.isEmpty())
         {
-            recordReportedPlayer(normalizedName, detectorService.getDisplayName(normalizedName));
+            recordReportedPlayer(normalizedName, displayName);
             detectorService.suppressName(normalizedName);
             refreshPanel(System.currentTimeMillis());
         }
+    }
+
+    private String getReportedPlayerName(MenuOptionClicked event)
+    {
+        MenuEntry menuEntry = event.getMenuEntry();
+        if (menuEntry != null && menuEntry.getPlayer() != null && menuEntry.getPlayer().getName() != null)
+        {
+            return menuEntry.getPlayer().getName();
+        }
+
+        return MenuHighlighter.extractPlayerNameFromTarget(event.getMenuTarget());
     }
 
     private boolean shouldTrack(Player player, Player localPlayer, WorldPoint localLocation, int radius)
@@ -262,6 +324,61 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         return player.getWorldLocation().distanceTo(localLocation) <= radius;
+    }
+
+    private boolean observeMobilePlayers(MenuEntry[] menuEntries)
+    {
+        if (menuEntries == null)
+        {
+            return false;
+        }
+
+        boolean changed = false;
+        for (MenuEntry entry : menuEntries)
+        {
+            if (entry != null && MenuHighlighter.hasMobileClientIcon(entry.getTarget()))
+            {
+                changed |= suppressMobilePlayer(getPlayerName(entry));
+            }
+        }
+
+        return changed;
+    }
+
+    private String getPlayerName(MenuEntry menuEntry)
+    {
+        if (menuEntry != null && menuEntry.getPlayer() != null && menuEntry.getPlayer().getName() != null)
+        {
+            return menuEntry.getPlayer().getName();
+        }
+
+        return menuEntry == null ? "" : MenuHighlighter.extractPlayerNameFromTarget(menuEntry.getTarget());
+    }
+
+    private boolean suppressMobilePlayer(String displayName)
+    {
+        String normalizedName = DetectorService.normalizeName(displayName);
+        if (normalizedName.isEmpty())
+        {
+            return false;
+        }
+
+        boolean added = mobilePlayerNames.add(normalizedName);
+        detectorService.suppressName(normalizedName);
+        return added;
+    }
+
+    private boolean isObservedMobilePlayer(String displayName, DetectorConfigSnapshot snapshot)
+    {
+        return snapshot.isIgnoreMobilePlayers() && mobilePlayerNames.contains(DetectorService.normalizeName(displayName));
+    }
+
+    private Set<String> getMobileOnlyNames()
+    {
+        Set<String> mobileOnlyNames = new HashSet<>(mobilePlayerNames);
+        mobileOnlyNames.removeAll(reportedPlayerStore.getNormalizedNames());
+        mobileOnlyNames.removeAll(getIgnoredNames());
+        return mobileOnlyNames;
     }
 
     private boolean isInRadius(Player player, int radius)
@@ -349,6 +466,10 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             reportedPlayerStore.clear();
             detectorService.unsuppressNames(reportedNames);
+            if (config.ignoreMobilePlayers())
+            {
+                detectorService.suppressNames(mobilePlayerNames);
+            }
             refreshPanel(System.currentTimeMillis());
         }
         catch (IOException ex)

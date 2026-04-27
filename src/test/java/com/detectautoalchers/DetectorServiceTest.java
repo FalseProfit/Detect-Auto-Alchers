@@ -285,6 +285,7 @@ public class DetectorServiceTest
             true,
             false,
             true,
+            true,
             21,
             10,
             2,

@@ -16,6 +16,7 @@ final class DetectorConfigSnapshot
     private final int suspicionThreshold;
     private final boolean requireFireStaff;
     private final boolean includeFireRuneStaves;
+    private final boolean ignoreMobilePlayers;
     private final boolean enableHiscoreScoring;
     private final int magicLevelThreshold;
     private final int nonMagicSkillThreshold;
@@ -41,6 +42,7 @@ final class DetectorConfigSnapshot
         int suspicionThreshold,
         boolean requireFireStaff,
         boolean includeFireRuneStaves,
+        boolean ignoreMobilePlayers,
         boolean enableHiscoreScoring,
         int magicLevelThreshold,
         int nonMagicSkillThreshold,
@@ -65,6 +67,7 @@ final class DetectorConfigSnapshot
         this.suspicionThreshold = suspicionThreshold;
         this.requireFireStaff = requireFireStaff;
         this.includeFireRuneStaves = includeFireRuneStaves;
+        this.ignoreMobilePlayers = ignoreMobilePlayers;
         this.enableHiscoreScoring = enableHiscoreScoring;
         this.magicLevelThreshold = magicLevelThreshold;
         this.nonMagicSkillThreshold = nonMagicSkillThreshold;
@@ -93,6 +96,7 @@ final class DetectorConfigSnapshot
             config.suspicionThreshold(),
             config.requireFireStaff(),
             config.includeFireRuneStaves(),
+            config.ignoreMobilePlayers(),
             config.enableHiscoreScoring(),
             config.magicLevelThreshold(),
             config.nonMagicSkillThreshold(),
@@ -122,6 +126,7 @@ final class DetectorConfigSnapshot
             80,
             true,
             false,
+            true,
             true,
             21,
             10,
@@ -170,6 +175,11 @@ final class DetectorConfigSnapshot
     boolean isIncludeFireRuneStaves()
     {
         return includeFireRuneStaves;
+    }
+
+    boolean isIgnoreMobilePlayers()
+    {
+        return ignoreMobilePlayers;
     }
 
     boolean isEnableHiscoreScoring()
