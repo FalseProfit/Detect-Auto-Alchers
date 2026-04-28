@@ -21,7 +21,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
 {
     private static final Color BACKGROUND = new Color(35, 35, 35);
     private static final Color ROW_BACKGROUND = new Color(45, 45, 45);
-    private static final Color ALERT = new Color(255, 83, 83);
+    private static final Color HIGH_CONFIDENCE_ALERT = new Color(255, 83, 83);
+    private static final Color MODERATE_CONFIDENCE_ALERT = new Color(255, 220, 64);
     private static final Color TEXT = new Color(230, 230, 230);
     private static final Color MUTED = new Color(170, 170, 170);
 
@@ -122,17 +123,18 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
     private void addSuspect(SuspicionResult suspect, long nowMillis)
     {
+        Color alert = suspect.isHighConfidence() ? HIGH_CONFIDENCE_ALERT : MODERATE_CONFIDENCE_ALERT;
         JPanel row = new JPanel();
         row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
         row.setBackground(ROW_BACKGROUND);
         row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ALERT.darker()),
+            BorderFactory.createLineBorder(alert.darker()),
             BorderFactory.createEmptyBorder(6, 8, 6, 8)
         ));
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel name = new JLabel(suspect.getDisplayName());
-        name.setForeground(ALERT);
+        name.setForeground(alert);
         name.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.add(name);
         row.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -141,6 +143,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
         details.setOpaque(false);
         details.setAlignmentX(Component.LEFT_ALIGNMENT);
+        addDetail(details, "confidence: " + suspect.getConfidenceLabel());
         addDetail(details, "score: " + suspect.getScore());
         addDetail(details, "casts: " + suspect.getCastCount());
         addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel()));

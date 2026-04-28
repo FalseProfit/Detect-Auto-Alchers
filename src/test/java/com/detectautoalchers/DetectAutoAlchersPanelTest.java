@@ -23,7 +23,7 @@ public class DetectAutoAlchersPanelTest
             "compact alcher",
             "Compact Alcher",
             120,
-            true,
+            DetectionConfidence.HIGH,
             12,
             true,
             true,
@@ -49,6 +49,7 @@ public class DetectAutoAlchersPanelTest
 
         assertTrue(containsLabel(panel, "magic: 89"));
         assertTrue(containsLabel(panel, "non-magic total: 40"));
+        assertTrue(containsLabel(panel, "confidence: high"));
         assertTrue(containsLabel(panel, "score: 120"));
         assertFalse(containsLabel(panel, "magic: 89  other"));
     }

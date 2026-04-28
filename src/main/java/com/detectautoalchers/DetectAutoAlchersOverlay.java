@@ -18,7 +18,8 @@ import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
 
 final class DetectAutoAlchersOverlay extends Overlay
 {
-    private static final Color OUTLINE_COLOR = new Color(255, 48, 48);
+    private static final Color HIGH_CONFIDENCE_OUTLINE_COLOR = new Color(255, 48, 48);
+    private static final Color MODERATE_CONFIDENCE_OUTLINE_COLOR = new Color(255, 220, 64);
 
     private final Client client;
     private final DetectorService detectorService;
@@ -68,12 +69,29 @@ final class DetectAutoAlchersOverlay extends Overlay
             {
                 drawPlayer(graphics, player, config.reportedPlayerHighlightColor());
             }
-            else if (detectorService.isSuspicious(player.getName()))
+            else
             {
-                drawPlayer(graphics, player, OUTLINE_COLOR);
+                Color confidenceColor = confidenceColor(detectorService.getConfidence(player.getName()));
+                if (confidenceColor != null)
+                {
+                    drawPlayer(graphics, player, confidenceColor);
+                }
             }
         }
 
+        return null;
+    }
+
+    private Color confidenceColor(DetectionConfidence confidence)
+    {
+        if (confidence == DetectionConfidence.HIGH)
+        {
+            return HIGH_CONFIDENCE_OUTLINE_COLOR;
+        }
+        if (confidence == DetectionConfidence.MODERATE)
+        {
+            return MODERATE_CONFIDENCE_OUTLINE_COLOR;
+        }
         return null;
     }
 

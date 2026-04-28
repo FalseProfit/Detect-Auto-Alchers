@@ -14,6 +14,7 @@ final class DetectorConfigSnapshot
     private final long observationWindowMillis;
     private final int castThreshold;
     private final int suspicionThreshold;
+    private final int highConfidenceThreshold;
     private final boolean requireFireStaff;
     private final boolean includeFireRuneStaves;
     private final boolean ignoreMobilePlayers;
@@ -40,6 +41,7 @@ final class DetectorConfigSnapshot
         long observationWindowMillis,
         int castThreshold,
         int suspicionThreshold,
+        int highConfidenceThreshold,
         boolean requireFireStaff,
         boolean includeFireRuneStaves,
         boolean ignoreMobilePlayers,
@@ -65,6 +67,7 @@ final class DetectorConfigSnapshot
         this.observationWindowMillis = observationWindowMillis;
         this.castThreshold = castThreshold;
         this.suspicionThreshold = suspicionThreshold;
+        this.highConfidenceThreshold = highConfidenceThreshold;
         this.requireFireStaff = requireFireStaff;
         this.includeFireRuneStaves = includeFireRuneStaves;
         this.ignoreMobilePlayers = ignoreMobilePlayers;
@@ -94,6 +97,7 @@ final class DetectorConfigSnapshot
             config.observationWindowSeconds() * 1000L,
             config.castThreshold(),
             config.suspicionThreshold(),
+            config.highConfidenceThreshold(),
             config.requireFireStaff(),
             config.includeFireRuneStaves(),
             config.ignoreMobilePlayers(),
@@ -124,6 +128,7 @@ final class DetectorConfigSnapshot
             60_000L,
             5,
             80,
+            110,
             true,
             false,
             true,
@@ -165,6 +170,11 @@ final class DetectorConfigSnapshot
     int getSuspicionThreshold()
     {
         return suspicionThreshold;
+    }
+
+    int getHighConfidenceThreshold()
+    {
+        return highConfidenceThreshold;
     }
 
     boolean isRequireFireStaff()

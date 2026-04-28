@@ -5,7 +5,7 @@ final class SuspicionResult
     private final String normalizedName;
     private final String displayName;
     private final int score;
-    private final boolean suspicious;
+    private final DetectionConfidence confidence;
     private final int castCount;
     private final boolean staffMatch;
     private final boolean behaviorMatch;
@@ -30,7 +30,7 @@ final class SuspicionResult
         String normalizedName,
         String displayName,
         int score,
-        boolean suspicious,
+        DetectionConfidence confidence,
         int castCount,
         boolean staffMatch,
         boolean behaviorMatch,
@@ -54,7 +54,7 @@ final class SuspicionResult
         this.normalizedName = normalizedName;
         this.displayName = displayName;
         this.score = score;
-        this.suspicious = suspicious;
+        this.confidence = confidence;
         this.castCount = castCount;
         this.staffMatch = staffMatch;
         this.behaviorMatch = behaviorMatch;
@@ -93,7 +93,22 @@ final class SuspicionResult
 
     boolean isSuspicious()
     {
-        return suspicious;
+        return confidence != DetectionConfidence.NONE;
+    }
+
+    DetectionConfidence getConfidence()
+    {
+        return confidence;
+    }
+
+    boolean isHighConfidence()
+    {
+        return confidence == DetectionConfidence.HIGH;
+    }
+
+    String getConfidenceLabel()
+    {
+        return confidence.getLabel();
     }
 
     int getCastCount()

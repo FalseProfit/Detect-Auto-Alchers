@@ -277,7 +277,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        MenuHighlighter.highlight(event.getMenuEntries(), detectorService.getSuspiciousNames());
+        MenuHighlighter.highlight(event.getMenuEntries(), detectorService.getSuspiciousConfidenceByName());
     }
 
     @Subscribe

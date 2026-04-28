@@ -1,6 +1,8 @@
 package com.detectautoalchers;
 
 import java.awt.Color;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import net.runelite.api.MenuEntry;
@@ -10,7 +12,8 @@ import net.runelite.client.util.Text;
 
 final class MenuHighlighter
 {
-    static final Color HIGHLIGHT_COLOR = new Color(255, 64, 64);
+    static final Color HIGH_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 64, 64);
+    static final Color MODERATE_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 220, 64);
     private static final Pattern LEVEL_SUFFIX_WITH_TRAILING_ICON = Pattern.compile(
         "(?i).*\\(level-\\d+\\)\\s*(?:<img=\\d+>\\s*)+$"
     );
@@ -22,22 +25,39 @@ final class MenuHighlighter
 
     static void highlight(MenuEntry[] menuEntries, Set<String> suspiciousNames)
     {
-        if (menuEntries == null || suspiciousNames.isEmpty())
+        Map<String, DetectionConfidence> confidenceByName = new LinkedHashMap<>();
+        for (String suspiciousName : suspiciousNames)
+        {
+            confidenceByName.put(suspiciousName, DetectionConfidence.HIGH);
+        }
+        highlight(menuEntries, confidenceByName);
+    }
+
+    static void highlight(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
+    {
+        if (menuEntries == null || confidenceByName.isEmpty())
         {
             return;
         }
 
         for (MenuEntry entry : menuEntries)
         {
-            if (entry == null || !shouldHighlight(entry, suspiciousNames))
+            if (entry == null)
             {
                 continue;
             }
 
-            entry.setTarget(colorTarget(entry.getTarget()));
+            DetectionConfidence confidence = confidenceFor(entry, confidenceByName);
+            Color color = colorFor(confidence);
+            if (color == null)
+            {
+                continue;
+            }
+
+            entry.setTarget(colorTarget(entry.getTarget(), color));
             if (isReportOption(entry.getOption()))
             {
-                entry.setOption(colorText(cleanText(entry.getOption())));
+                entry.setOption(colorText(cleanText(entry.getOption()), color));
             }
         }
     }
@@ -79,6 +99,11 @@ final class MenuHighlighter
 
     static String colorTarget(String target)
     {
+        return colorTarget(target, HIGH_CONFIDENCE_HIGHLIGHT_COLOR);
+    }
+
+    static String colorTarget(String target, Color color)
+    {
         String trailingImages = "";
         java.util.regex.Matcher matcher = TRAILING_IMAGE_TAGS.matcher(target == null ? "" : target);
         if (matcher.find())
@@ -86,23 +111,48 @@ final class MenuHighlighter
             trailingImages = matcher.group().trim();
         }
 
-        return colorText(cleanText(target)) + trailingImages;
+        return colorText(cleanText(target), color) + trailingImages;
     }
 
     static String colorText(String text)
     {
-        return ColorUtil.wrapWithColorTag(text, HIGHLIGHT_COLOR);
+        return colorText(text, HIGH_CONFIDENCE_HIGHLIGHT_COLOR);
     }
 
-    private static boolean shouldHighlight(MenuEntry entry, Set<String> suspiciousNames)
+    static String colorText(String text, Color color)
+    {
+        return ColorUtil.wrapWithColorTag(text, color);
+    }
+
+    private static DetectionConfidence confidenceFor(
+        MenuEntry entry,
+        Map<String, DetectionConfidence> confidenceByName)
     {
         Player player = entry.getPlayer();
-        if (player != null && suspiciousNames.contains(DetectorService.normalizeName(player.getName())))
+        if (player != null)
         {
-            return true;
+            DetectionConfidence confidence = confidenceByName.get(DetectorService.normalizeName(player.getName()));
+            if (confidence != null)
+            {
+                return confidence;
+            }
         }
 
-        return shouldHighlightTarget(entry.getTarget(), suspiciousNames);
+        String matchingName = findMatchingSuspiciousName(entry.getTarget(), confidenceByName.keySet());
+        return confidenceByName.getOrDefault(matchingName, DetectionConfidence.NONE);
+    }
+
+    private static Color colorFor(DetectionConfidence confidence)
+    {
+        if (confidence == DetectionConfidence.HIGH)
+        {
+            return HIGH_CONFIDENCE_HIGHLIGHT_COLOR;
+        }
+        if (confidence == DetectionConfidence.MODERATE)
+        {
+            return MODERATE_CONFIDENCE_HIGHLIGHT_COLOR;
+        }
+        return null;
     }
 
     private static boolean isReportOption(String option)

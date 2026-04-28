@@ -74,8 +74,8 @@ public interface DetectAutoAlchersConfig extends Config
 
     @ConfigItem(
         keyName = "suspicionThreshold",
-        name = "Suspicion threshold",
-        description = "Final detection score required before the plugin highlights a suspected player. Default: 80.",
+        name = "Moderate confidence threshold",
+        description = "Final detection score required before the plugin highlights a moderate-confidence suspected player. Default: 80.",
         position = 3,
         section = basicSection
     )
@@ -86,10 +86,23 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "highConfidenceThreshold",
+        name = "High confidence threshold",
+        description = "Final detection score required before the plugin highlights a high-confidence suspected player. Default: 110.",
+        position = 4,
+        section = basicSection
+    )
+    @Range(min = 1, max = 300)
+    default int highConfidenceThreshold()
+    {
+        return 110;
+    }
+
+    @ConfigItem(
         keyName = "requireFireStaff",
         name = "Require fire staff",
         description = "Require the player to be seen wielding a fire staff before they can be highlighted. Default: on.",
-        position = 4,
+        position = 5,
         section = basicSection
     )
     default boolean requireFireStaff()
@@ -101,7 +114,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "includeFireRuneStaves",
         name = "Broad fire staff match",
         description = "Also treat battlestaves and combination staves that provide fire runes as staff evidence. Default: off.",
-        position = 5,
+        position = 6,
         section = basicSection
     )
     default boolean includeFireRuneStaves()
@@ -113,7 +126,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "ignoreMobilePlayers",
         name = "Ignore mobile players",
         description = "Ignore players when the right-click menu shows the mobile client icon next to their name. Default: on.",
-        position = 6,
+        position = 7,
         section = basicSection
     )
     default boolean ignoreMobilePlayers()
@@ -125,7 +138,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "hiscoreCooldownMinutes",
         name = "Hiscore cooldown",
         description = "Minutes to wait before retrying a failed or missing hiscore lookup for the same player. Default: 3 minutes.",
-        position = 7,
+        position = 8,
         section = basicSection
     )
     @Range(min = 1, max = 120)
@@ -138,7 +151,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "alchemyAnimationIds",
         name = "Alchemy animation IDs",
         description = "Comma-separated player animation IDs treated as alchemy-like observations. Default: 713.",
-        position = 8,
+        position = 9,
         section = basicSection
     )
     default String alchemyAnimationIds()
@@ -150,7 +163,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "alchemySpotAnimationIds",
         name = "Alchemy spotanim IDs",
         description = "Comma-separated spot-animation IDs treated as alchemy-like observations. Default: 112,113.",
-        position = 9,
+        position = 10,
         section = basicSection
     )
     default String alchemySpotAnimationIds()
@@ -161,8 +174,8 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "showOverlay",
         name = "Show overlay",
-        description = "Draw red outlines around players whose final detection score meets the suspicion threshold. Default: on.",
-        position = 10,
+        description = "Draw colored outlines around players whose final detection score meets a confidence threshold. Default: on.",
+        position = 11,
         section = basicSection
     )
     default boolean showOverlay()
@@ -173,8 +186,8 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "colorMenuEntries",
         name = "Color menu entries",
-        description = "Color right-click menu entries red for players currently highlighted as suspects. Default: on.",
-        position = 11,
+        description = "Color right-click menu entries for players currently highlighted as suspects. Default: on.",
+        position = 12,
         section = basicSection
     )
     default boolean colorMenuEntries()
@@ -186,7 +199,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "persistReportedPlayers",
         name = "Persist reported players",
         description = "Save reported players locally so they are not suggested again after restarting RuneLite. Default: on.",
-        position = 12,
+        position = 13,
         section = basicSection
     )
     default boolean persistReportedPlayers()
@@ -198,7 +211,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "highlightReportedPlayers",
         name = "Highlight reported players",
         description = "Draw a separate outline around players already saved in local report history. Default: on.",
-        position = 13,
+        position = 14,
         section = basicSection
     )
     default boolean highlightReportedPlayers()
@@ -210,7 +223,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "reportedPlayerHighlightColor",
         name = "Reported highlight color",
         description = "Outline color for players already saved in local report history. Default: RGB 144,238,144.",
-        position = 14,
+        position = 15,
         section = basicSection
     )
     default Color reportedPlayerHighlightColor()

@@ -21,13 +21,15 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Radius: 15 tiles
 - Observation window: 60 seconds
 - Cast threshold: 5 observations
-- Suspicion score threshold: 80
+- Moderate confidence threshold: 80
+- High confidence threshold: 110
 - Staff requirement: enabled
 - Broad fire-rune staff matching: disabled
 - Hiscore scoring: enabled
 - High-Magic scoring: enabled for Magic level 99
 - Non-Magic total reduction threshold: 150
 - Clue/collection-log reduction threshold: more than 5 combined entries
+- High-confidence suspects are highlighted red; moderate-confidence suspects are highlighted yellow
 - Persistent reported-player history: enabled
 
 The animation and spot-animation ID lists are configurable. The defaults are seeded for Low/High Alchemy-style observations and should be validated in a RuneLite developer client.

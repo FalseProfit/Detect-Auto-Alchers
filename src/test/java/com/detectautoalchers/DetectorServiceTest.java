@@ -29,7 +29,28 @@ public class DetectorServiceTest
         assertEquals(1, suspects.size());
         assertEquals("Alch Bot", suspects.get(0).getDisplayName());
         assertTrue(suspects.get(0).isSuspicious());
+        assertTrue(suspects.get(0).isHighConfidence());
+        assertEquals(DetectionConfidence.HIGH, service.getConfidence("Alch Bot"));
         assertEquals(120, suspects.get(0).getScore());
+    }
+
+    @Test
+    public void staffAndBehaviorFlagsModerateConfidence()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        service.updatePlayer("Moderate Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Moderate Alcher", now, config);
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertEquals(DetectionConfidence.MODERATE, suspects.get(0).getConfidence());
+        assertEquals(DetectionConfidence.MODERATE, service.getConfidence("Moderate Alcher"));
+        assertEquals(90, suspects.get(0).getScore());
     }
 
     @Test
@@ -282,6 +303,7 @@ public class DetectorServiceTest
             60_000L,
             5,
             80,
+            110,
             true,
             false,
             true,

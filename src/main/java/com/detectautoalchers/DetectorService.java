@@ -223,6 +223,16 @@ final class DetectorService
         return names;
     }
 
+    synchronized Map<String, DetectionConfidence> getSuspiciousConfidenceByName()
+    {
+        Map<String, DetectionConfidence> confidenceByName = new LinkedHashMap<>();
+        for (SuspicionResult result : getSuspiciousResults())
+        {
+            confidenceByName.put(result.getNormalizedName(), result.getConfidence());
+        }
+        return confidenceByName;
+    }
+
     synchronized boolean isSuspicious(String displayName)
     {
         PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));
@@ -230,6 +240,19 @@ final class DetectorService
             && !suppressedNames.contains(evidence.getNormalizedName())
             && evidence.getLastResult() != null
             && evidence.getLastResult().isSuspicious();
+    }
+
+    synchronized DetectionConfidence getConfidence(String displayName)
+    {
+        PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));
+        if (evidence == null
+            || suppressedNames.contains(evidence.getNormalizedName())
+            || evidence.getLastResult() == null)
+        {
+            return DetectionConfidence.NONE;
+        }
+
+        return evidence.getLastResult().getConfidence();
     }
 
     synchronized String findSuspiciousNameFromTarget(String target)
@@ -313,13 +336,18 @@ final class DetectorService
         }
 
         boolean staffGatePassed = !config.isRequireFireStaff() || staffMatch;
-        boolean suspicious = staffGatePassed && score >= config.getSuspicionThreshold();
+        DetectionConfidence confidence = DetectionConfidence.fromScore(
+            score,
+            staffGatePassed,
+            config.getSuspicionThreshold(),
+            config.getHighConfidenceThreshold()
+        );
 
         return new SuspicionResult(
             evidence.getNormalizedName(),
             evidence.getDisplayName(),
             score,
-            suspicious,
+            confidence,
             castCount,
             staffMatch,
             behaviorMatch,
