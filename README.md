@@ -26,7 +26,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Broad fire-rune staff matching: disabled
 - Hiscore scoring: enabled
 - High-Magic scoring: enabled for Magic level 99
-- Non-Magic total reduction threshold: 125
+- Non-Magic total reduction threshold: 150
 - Clue/collection-log reduction threshold: more than 5 combined entries
 - Persistent reported-player history: enabled
 
