@@ -1,6 +1,7 @@
 package com.detectautoalchers;
 
 import java.awt.Color;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +36,16 @@ final class MenuHighlighter
 
     static void highlight(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
     {
-        if (menuEntries == null || confidenceByName.isEmpty())
+        highlight(menuEntries, confidenceByName, Collections.emptySet(), null);
+    }
+
+    static void highlight(
+        MenuEntry[] menuEntries,
+        Map<String, DetectionConfidence> confidenceByName,
+        Set<String> reportedNames,
+        Color reportedColor)
+    {
+        if (menuEntries == null || (confidenceByName.isEmpty() && reportedNames.isEmpty()))
         {
             return;
         }
@@ -47,8 +57,12 @@ final class MenuHighlighter
                 continue;
             }
 
-            DetectionConfidence confidence = confidenceFor(entry, confidenceByName);
-            Color color = colorFor(confidence);
+            Color color = reportedColorFor(entry, reportedNames, reportedColor);
+            if (color == null)
+            {
+                DetectionConfidence confidence = confidenceFor(entry, confidenceByName);
+                color = colorFor(confidence);
+            }
             if (color == null)
             {
                 continue;
@@ -140,6 +154,23 @@ final class MenuHighlighter
 
         String matchingName = findMatchingSuspiciousName(entry.getTarget(), confidenceByName.keySet());
         return confidenceByName.getOrDefault(matchingName, DetectionConfidence.NONE);
+    }
+
+    private static Color reportedColorFor(MenuEntry entry, Set<String> reportedNames, Color reportedColor)
+    {
+        if (reportedColor == null || reportedNames.isEmpty())
+        {
+            return null;
+        }
+
+        Player player = entry.getPlayer();
+        if (player != null && reportedNames.contains(DetectorService.normalizeName(player.getName())))
+        {
+            return reportedColor;
+        }
+
+        String matchingName = findMatchingSuspiciousName(entry.getTarget(), reportedNames);
+        return matchingName.isEmpty() ? null : reportedColor;
     }
 
     private static Color colorFor(DetectionConfidence confidence)
