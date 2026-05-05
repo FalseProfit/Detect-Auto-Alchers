@@ -67,7 +67,7 @@ final class DetectorConfigSnapshot
         this.observationWindowMillis = observationWindowMillis;
         this.castThreshold = castThreshold;
         this.suspicionThreshold = suspicionThreshold;
-        this.highConfidenceThreshold = highConfidenceThreshold;
+        this.highConfidenceThreshold = Math.max(highConfidenceThreshold, suspicionThreshold + 1);
         this.requireFireStaff = requireFireStaff;
         this.includeFireRuneStaves = includeFireRuneStaves;
         this.ignoreMobilePlayers = ignoreMobilePlayers;
@@ -92,12 +92,13 @@ final class DetectorConfigSnapshot
 
     static DetectorConfigSnapshot from(DetectAutoAlchersConfig config)
     {
+        int suspicionThreshold = config.suspicionThreshold();
         return new DetectorConfigSnapshot(
             config.radius(),
             config.observationWindowSeconds() * 1000L,
             config.castThreshold(),
-            config.suspicionThreshold(),
-            config.highConfidenceThreshold(),
+            suspicionThreshold,
+            suspicionThreshold + config.highConfidenceMargin(),
             config.requireFireStaff(),
             config.includeFireRuneStaves(),
             config.ignoreMobilePlayers(),

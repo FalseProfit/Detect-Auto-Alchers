@@ -22,7 +22,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Observation window: 60 seconds
 - Cast threshold: 5 observations
 - Moderate confidence threshold: 80
-- High confidence threshold: 110
+- High confidence margin: +30, for an effective high confidence threshold of 110
 - Staff requirement: enabled
 - Broad fire-rune staff matching: disabled
 - Hiscore scoring: enabled

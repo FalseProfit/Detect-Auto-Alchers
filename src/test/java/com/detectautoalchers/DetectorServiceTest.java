@@ -54,6 +54,37 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void highConfidenceThresholdCannotFallBelowModerateThreshold()
+    {
+        DetectorConfigSnapshot config = configWithConfidenceThresholds(100, 80);
+
+        assertEquals(100, config.getSuspicionThreshold());
+        assertEquals(101, config.getHighConfidenceThreshold());
+    }
+
+    @Test
+    public void configSnapshotUsesHighConfidenceMargin()
+    {
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.from(new DetectAutoAlchersConfig()
+        {
+            @Override
+            public int suspicionThreshold()
+            {
+                return 90;
+            }
+
+            @Override
+            public int highConfidenceMargin()
+            {
+                return 25;
+            }
+        });
+
+        assertEquals(90, config.getSuspicionThreshold());
+        assertEquals(115, config.getHighConfidenceThreshold());
+    }
+
+    @Test
     public void matureAccountPenaltyDropsScoreBelowThreshold()
     {
         DetectorService service = new DetectorService();
@@ -319,6 +350,37 @@ public class DetectorServiceTest
             100,
             threshold,
             penalty,
+            15 * 60_000L,
+            IdListParser.parse("713"),
+            IdListParser.parse("112,113"),
+            true,
+            true
+        );
+    }
+
+    private DetectorConfigSnapshot configWithConfidenceThresholds(int moderateThreshold, int highThreshold)
+    {
+        return new DetectorConfigSnapshot(
+            15,
+            60_000L,
+            5,
+            moderateThreshold,
+            highThreshold,
+            true,
+            false,
+            true,
+            true,
+            21,
+            10,
+            2,
+            true,
+            99,
+            100,
+            true,
+            125,
+            100,
+            5,
+            100,
             15 * 60_000L,
             IdListParser.parse("713"),
             IdListParser.parse("112,113"),

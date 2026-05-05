@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class DetectAutoAlchersPlugin extends Plugin
 {
     private static final Logger log = LoggerFactory.getLogger(DetectAutoAlchersPlugin.class);
+    private static final String CONFIG_GROUP = "detectautoalchers";
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
 
@@ -137,20 +138,23 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Subscribe
     public void onConfigChanged(ConfigChanged event)
     {
-        if (!"detectautoalchers".equals(event.getGroup()) || !"ignoreMobilePlayers".equals(event.getKey()))
+        if (!CONFIG_GROUP.equals(event.getGroup()))
         {
             return;
         }
 
-        if (config.ignoreMobilePlayers())
+        if ("ignoreMobilePlayers".equals(event.getKey()))
         {
-            detectorService.suppressNames(mobilePlayerNames);
+            if (config.ignoreMobilePlayers())
+            {
+                detectorService.suppressNames(mobilePlayerNames);
+            }
+            else
+            {
+                detectorService.unsuppressNames(getMobileOnlyNames());
+            }
+            refreshPanel(System.currentTimeMillis());
         }
-        else
-        {
-            detectorService.unsuppressNames(getMobileOnlyNames());
-        }
-        refreshPanel(System.currentTimeMillis());
     }
 
     @Subscribe

@@ -86,11 +86,23 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
-        keyName = "highConfidenceThreshold",
-        name = "High confidence threshold",
-        description = "Final detection score required before the plugin highlights a high-confidence suspected player. Default: 110.",
+        keyName = "highConfidenceMargin",
+        name = "High confidence margin",
+        description = "Additional score above the moderate confidence threshold required before the plugin highlights a high-confidence suspected player. Default: +30.",
         position = 4,
         section = basicSection
+    )
+    @Range(min = 1, max = 300)
+    default int highConfidenceMargin()
+    {
+        return 30;
+    }
+
+    @ConfigItem(
+        keyName = "highConfidenceThreshold",
+        name = "High confidence threshold",
+        description = "Legacy absolute high-confidence threshold.",
+        hidden = true
     )
     @Range(min = 1, max = 300)
     default int highConfidenceThreshold()
@@ -335,7 +347,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "nonMagicTotalLevelSuppressionThreshold",
         name = "Non-Magic total threshold",
-        description = "Non-Magic total level at or above this value receives the non-Magic total score reduction. Default: 125.",
+        description = "Non-Magic total level at or above this value receives the non-Magic total score reduction. Default: 150.",
         position = 1,
         section = scoreReductionsSection
     )
