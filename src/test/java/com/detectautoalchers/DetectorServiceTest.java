@@ -54,6 +54,28 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void magicThresholdSuppressesAllScoreForKnownLowMagicProfile()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot initialConfig = DetectorConfigSnapshot.defaultsForTesting();
+        DetectorConfigSnapshot raisedMagicThresholdConfig = configWithMagicThreshold(70);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Low Magic Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Low Magic Alcher", now, initialConfig);
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, 40, true));
+
+        service.recompute(initialConfig, now + 3_000L);
+        assertEquals(1, service.getSuspiciousResults().size());
+
+        service.recompute(raisedMagicThresholdConfig, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Low Magic Alcher"));
+        assertEquals(DetectionConfidence.NONE, service.getConfidence("Low Magic Alcher"));
+    }
+
+    @Test
     public void highConfidenceThresholdCannotFallBelowModerateThreshold()
     {
         DetectorConfigSnapshot config = configWithConfidenceThresholds(100, 80);
@@ -356,7 +378,7 @@ public class DetectorServiceTest
             false,
             true,
             true,
-            21,
+            53,
             10,
             2,
             true,
@@ -367,6 +389,37 @@ public class DetectorServiceTest
             100,
             threshold,
             penalty,
+            15 * 60_000L,
+            IdListParser.parse("713"),
+            IdListParser.parse("112,113"),
+            true,
+            true
+        );
+    }
+
+    private DetectorConfigSnapshot configWithMagicThreshold(int magicThreshold)
+    {
+        return new DetectorConfigSnapshot(
+            15,
+            60_000L,
+            5,
+            80,
+            110,
+            true,
+            false,
+            true,
+            true,
+            magicThreshold,
+            10,
+            2,
+            true,
+            99,
+            100,
+            true,
+            125,
+            100,
+            5,
+            100,
             15 * 60_000L,
             IdListParser.parse("713"),
             IdListParser.parse("112,113"),
@@ -387,7 +440,7 @@ public class DetectorServiceTest
             false,
             true,
             true,
-            21,
+            53,
             10,
             2,
             true,

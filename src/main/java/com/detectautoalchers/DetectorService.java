@@ -285,8 +285,16 @@ final class DetectorService
         boolean staffMatch = staffMatches(evidence, config);
         boolean behaviorMatch = castCount >= config.getCastThreshold();
         HiscoreProfile hiscoreProfile = evidence.getHiscoreProfile();
-        boolean magicDominant = config.isEnableHiscoreScoring() && hiscoreProfile.isMagicDominant();
+        boolean belowMagicThreshold = config.isEnableHiscoreScoring()
+            && hiscoreProfile.isBelowMagicLevel(config.getMagicLevelThreshold());
+        boolean magicDominant = config.isEnableHiscoreScoring()
+            && !belowMagicThreshold
+            && hiscoreProfile.isAtLeastMagicLevel(config.getMagicLevelThreshold())
+            && hiscoreProfile.hasAtMostNonMagicSkillsAboveThreshold(
+                config.getAllowedNonMagicSkillsAboveThreshold()
+            );
         boolean highMagic = config.isEnableHiscoreScoring()
+            && !belowMagicThreshold
             && config.isEnableMaxMagicScoring()
             && hiscoreProfile.isAtLeastMagicLevel(config.getMaxMagicLevelThreshold());
         boolean consistentCadence = behaviorMatch && evidence.hasConsistentCadence(
@@ -295,27 +303,27 @@ final class DetectorService
             config.getCastThreshold()
         );
 
-        if (staffMatch)
+        if (!belowMagicThreshold && staffMatch)
         {
             score += DetectorConfigSnapshot.STAFF_SCORE;
         }
 
-        if (behaviorMatch)
+        if (!belowMagicThreshold && behaviorMatch)
         {
             score += DetectorConfigSnapshot.BEHAVIOR_SCORE;
         }
 
-        if (magicDominant)
+        if (!belowMagicThreshold && magicDominant)
         {
             score += DetectorConfigSnapshot.HISCORE_SCORE;
         }
 
-        if (highMagic)
+        if (!belowMagicThreshold && highMagic)
         {
             score += config.getMaxMagicScore();
         }
 
-        if (consistentCadence)
+        if (!belowMagicThreshold && consistentCadence)
         {
             score += DetectorConfigSnapshot.CADENCE_SCORE;
         }

@@ -270,14 +270,14 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "magicLevelThreshold",
         name = "Magic threshold",
-        description = "Minimum Magic level required before the Magic-dominant hiscore rule can add score. Default: 21.",
+        description = "Minimum Magic level required before a target player can receive detection score. Default: 53. Set to 21 to include Low Alchemy bots.",
         position = 1,
         section = scoreIncreasesSection
     )
     @Range(min = 1, max = 99)
     default int magicLevelThreshold()
     {
-        return 21;
+        return 53;
     }
 
     @ConfigItem(

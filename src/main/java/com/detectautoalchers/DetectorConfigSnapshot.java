@@ -134,7 +134,7 @@ final class DetectorConfigSnapshot
             false,
             true,
             true,
-            21,
+            53,
             10,
             2,
             true,

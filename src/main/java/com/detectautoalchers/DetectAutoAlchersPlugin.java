@@ -154,8 +154,11 @@ public class DetectAutoAlchersPlugin extends Plugin
             {
                 detectorService.unsuppressNames(getMobileOnlyNames());
             }
-            refreshPanel(System.currentTimeMillis());
         }
+
+        long nowMillis = System.currentTimeMillis();
+        detectorService.recompute(DetectorConfigSnapshot.from(config), nowMillis);
+        refreshPanel(nowMillis);
     }
 
     @Subscribe

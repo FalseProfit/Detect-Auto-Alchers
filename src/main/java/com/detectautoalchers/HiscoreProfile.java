@@ -150,6 +150,16 @@ final class HiscoreProfile
         return status == Status.FOUND && magicLevel >= threshold;
     }
 
+    boolean isBelowMagicLevel(int threshold)
+    {
+        return status == Status.FOUND && magicLevel < threshold;
+    }
+
+    boolean hasAtMostNonMagicSkillsAboveThreshold(int threshold)
+    {
+        return status == Status.FOUND && nonMagicSkillsAboveThreshold <= threshold;
+    }
+
     boolean isMagicDominant()
     {
         return status == Status.FOUND && magicDominant;
