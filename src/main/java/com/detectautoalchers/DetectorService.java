@@ -233,6 +233,20 @@ final class DetectorService
         return confidenceByName;
     }
 
+    synchronized Map<String, Integer> getScoresByName()
+    {
+        Map<String, Integer> scoresByName = new LinkedHashMap<>();
+        for (PlayerEvidence evidence : evidenceByName.values())
+        {
+            SuspicionResult result = evidence.getLastResult();
+            if (result != null && !suppressedNames.contains(result.getNormalizedName()))
+            {
+                scoresByName.put(result.getNormalizedName(), result.getScore());
+            }
+        }
+        return scoresByName;
+    }
+
     synchronized boolean isSuspicious(String displayName)
     {
         PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));

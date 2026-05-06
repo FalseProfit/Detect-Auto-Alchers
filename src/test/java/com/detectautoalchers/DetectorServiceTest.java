@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public class DetectorServiceTest
@@ -51,6 +52,44 @@ public class DetectorServiceTest
         assertEquals(DetectionConfidence.MODERATE, suspects.get(0).getConfidence());
         assertEquals(DetectionConfidence.MODERATE, service.getConfidence("Moderate Alcher"));
         assertEquals(90, suspects.get(0).getScore());
+    }
+
+    @Test
+    public void returnsLatestScoresForAllCurrentEvidence()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String suspiciousName = service.updatePlayer("Scored Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Scored Alcher", now, config);
+        service.applyHiscore(suspiciousName, HiscoreProfile.found(55, 1, 40, true));
+        service.updatePlayer("Idle Staff", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+
+        service.recompute(config, now + 3_000L);
+        Map<String, Integer> scoresByName = service.getScoresByName();
+
+        assertEquals(Integer.valueOf(120), scoresByName.get("scored alcher"));
+        assertEquals(Integer.valueOf(30), scoresByName.get("idle staff"));
+        assertFalse(service.isSuspicious("Idle Staff"));
+        assertFalse(scoresByName.containsKey("unknown player"));
+    }
+
+    @Test
+    public void suppressedNamesAreExcludedFromScoreMap()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        service.updatePlayer("Suppressed Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Suppressed Alcher", now, config);
+        service.recompute(config, now + 3_000L);
+
+        service.suppressName("Suppressed Alcher");
+
+        assertFalse(service.getScoresByName().containsKey("suppressed alcher"));
+        assertFalse(service.getScoresByName().containsKey("unknown player"));
     }
 
     @Test

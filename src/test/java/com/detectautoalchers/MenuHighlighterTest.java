@@ -121,8 +121,62 @@ public class MenuHighlighterTest
     public void detectsMobileClientIconAfterCombatLevel()
     {
         assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3)<img=23>"));
+        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Score: 120)<img=23>"));
+        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ff4040>Auto Bot (level-3) (Score: 120)</col><img=23>"));
         assertFalse(MenuHighlighter.hasMobileClientIcon("<img=23><col=ffffff>Auto Bot<col=ff0000> (level-3)"));
         assertFalse(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3)"));
+    }
+
+    @Test
+    public void appendsDetectionScoreAfterCombatLevel()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
+        Map<String, Integer> scoresByName = Collections.singletonMap("username", 120);
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName);
+
+        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 120)", entry.getTarget());
+    }
+
+    @Test
+    public void appendsZeroForUnknownPlayerScores()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Unknown Player<col=ff0000> (level-98)");
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.emptyMap());
+
+        assertEquals("<col=ffffff>Unknown Player<col=ff0000> (level-98) (Score: 0)", entry.getTarget());
+    }
+
+    @Test
+    public void appendsDetectionScoreBeforeTrailingMobileIcon()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)<img=23>");
+        Map<String, Integer> scoresByName = Collections.singletonMap("username", 120);
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName);
+
+        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 120)<img=23>", entry.getTarget());
+    }
+
+    @Test
+    public void replacesExistingDetectionScoreWithoutDuplicating()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 120));
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 140));
+
+        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 140)", entry.getTarget());
+    }
+
+    @Test
+    public void extractsPlayerNameFromTargetWithDetectionScore()
+    {
+        assertEquals(
+            "Auto Bot",
+            MenuHighlighter.extractPlayerNameFromTarget("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Score: 120)<img=23>")
+        );
     }
 
     private static MenuEntry testMenuEntry(String option, String target)

@@ -18,8 +18,12 @@ final class MenuHighlighter
     static final Color HIGH_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 64, 64);
     static final Color MODERATE_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 220, 64);
     private static final Pattern LEVEL_SUFFIX_WITH_TRAILING_ICON = Pattern.compile(
-        "(?i).*\\(level-\\d+\\)\\s*(?:<img=\\d+>\\s*)+$"
+        "(?i).*\\(level-\\d+\\)\\s*(?:\\(score:\\s*\\d+\\)\\s*)?(?:<img=\\d+>\\s*)+$"
     );
+    private static final Pattern LEVEL_SUFFIX = Pattern.compile("(?i).*\\(level-\\d+\\)(?:\\s+\\(score:\\s*\\d+\\))?\\s*$");
+    private static final Pattern SCORE_SUFFIX = Pattern.compile("(?i)\\s*\\(score:\\s*\\d+\\)(\\s*(?:<img=\\d+>\\s*)*)$");
+    private static final Pattern SCORE_SUFFIX_TEXT = Pattern.compile("(?i)\\s+\\(score:\\s*\\d+\\)\\s*$");
+    private static final Pattern COLOR_TAGS = Pattern.compile("(?i)</?col(?:=[0-9a-f]+)?>");
     private static final Pattern TRAILING_IMAGE_TAGS = Pattern.compile("(?i)(?:\\s*<img=\\d+>)+\\s*$");
 
     private MenuHighlighter()
@@ -49,6 +53,27 @@ final class MenuHighlighter
         }
 
         Arrays.sort(menuEntries, Comparator.comparingInt(entry -> menuPriority(entry, confidenceByName)));
+    }
+
+    static void appendScores(MenuEntry[] menuEntries, Map<String, Integer> scoresByName)
+    {
+        if (menuEntries == null)
+        {
+            return;
+        }
+
+        Map<String, Integer> scores = scoresByName == null ? Collections.emptyMap() : scoresByName;
+        for (MenuEntry entry : menuEntries)
+        {
+            if (entry == null || !isPlayerMenuEntry(entry))
+            {
+                continue;
+            }
+
+            String normalizedName = normalizedPlayerName(entry);
+            int score = scores.getOrDefault(normalizedName, 0);
+            entry.setTarget(appendScore(entry.getTarget(), score));
+        }
     }
 
     static void highlight(
@@ -115,12 +140,13 @@ final class MenuHighlighter
             .replace("&nbsp;", " ")
             .replaceAll("\\s+", " ")
             .trim();
-        return cleaned.replaceFirst("\\s+\\(level-\\d+\\)$", "").trim();
+        cleaned = SCORE_SUFFIX_TEXT.matcher(cleaned).replaceFirst("").trim();
+        return cleaned.replaceFirst("(?i)\\s+\\(level-\\d+\\)$", "").trim();
     }
 
     static boolean hasMobileClientIcon(String target)
     {
-        return target != null && LEVEL_SUFFIX_WITH_TRAILING_ICON.matcher(target).matches();
+        return target != null && LEVEL_SUFFIX_WITH_TRAILING_ICON.matcher(stripColorTags(target)).matches();
     }
 
     static String colorTarget(String target)
@@ -220,5 +246,50 @@ final class MenuHighlighter
     static String cleanText(String target)
     {
         return Text.removeTags(target == null ? "" : target);
+    }
+
+    private static boolean isPlayerMenuEntry(MenuEntry entry)
+    {
+        if (entry.getPlayer() != null)
+        {
+            return true;
+        }
+
+        return LEVEL_SUFFIX.matcher(cleanText(entry.getTarget())).matches();
+    }
+
+    private static String normalizedPlayerName(MenuEntry entry)
+    {
+        Player player = entry.getPlayer();
+        if (player != null && player.getName() != null)
+        {
+            return DetectorService.normalizeName(player.getName());
+        }
+
+        return DetectorService.normalizeName(extractPlayerNameFromTarget(entry.getTarget()));
+    }
+
+    private static String appendScore(String target, int score)
+    {
+        if (target == null || target.isEmpty())
+        {
+            return target;
+        }
+
+        String withoutExistingScore = SCORE_SUFFIX.matcher(target).replaceFirst("$1");
+        java.util.regex.Matcher matcher = TRAILING_IMAGE_TAGS.matcher(withoutExistingScore);
+        if (!matcher.find())
+        {
+            return withoutExistingScore + " (Score: " + score + ")";
+        }
+
+        String body = withoutExistingScore.substring(0, matcher.start()).replaceFirst("\\s+$", "");
+        String trailingImages = matcher.group().trim();
+        return body + " (Score: " + score + ")" + trailingImages;
+    }
+
+    private static String stripColorTags(String target)
+    {
+        return COLOR_TAGS.matcher(target).replaceAll("");
     }
 }

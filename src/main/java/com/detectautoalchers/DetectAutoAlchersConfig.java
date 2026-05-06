@@ -33,6 +33,14 @@ public interface DetectAutoAlchersConfig extends Config
     )
     String scoreReductionsSection = "scoreReductions";
 
+    @ConfigSection(
+        name = "Debug",
+        description = "Debugging options for inspecting detector state",
+        position = 3,
+        closedByDefault = true
+    )
+    String debugSection = "debug";
+
     @ConfigItem(
         keyName = "radius",
         name = "Detection radius",
@@ -253,6 +261,18 @@ public interface DetectAutoAlchersConfig extends Config
     default Color reportedPlayerHighlightColor()
     {
         return new Color(144, 238, 144);
+    }
+
+    @ConfigItem(
+        keyName = "showMenuDetectionScores",
+        name = "Show menu detection scores",
+        description = "Show each right-clicked player's current detection score for debugging. Unknown, untracked, and suppressed players display 0. Default: off.",
+        position = 0,
+        section = debugSection
+    )
+    default boolean showMenuDetectionScores()
+    {
+        return false;
     }
 
     @ConfigItem(
