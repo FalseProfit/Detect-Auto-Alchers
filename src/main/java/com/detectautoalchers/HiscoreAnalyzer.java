@@ -63,7 +63,7 @@ final class HiscoreAnalyzer
 
     private static int activityCount(Skill skill)
     {
-        if (skill == null || skill.getRank() < 0 || skill.getLevel() < 0)
+        if (skill == null || skill.getLevel() < 0)
         {
             return 0;
         }

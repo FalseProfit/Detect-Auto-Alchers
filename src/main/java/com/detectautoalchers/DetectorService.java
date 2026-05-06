@@ -335,10 +335,10 @@ final class DetectorService
             score = Math.max(0, score - config.getClueCollectionActivityScorePenalty());
         }
 
-        boolean staffGatePassed = !config.isRequireFireStaff() || staffMatch;
+        boolean detectionGatePassed = behaviorMatch && (!config.isRequireFireStaff() || staffMatch);
         DetectionConfidence confidence = DetectionConfidence.fromScore(
             score,
-            staffGatePassed,
+            detectionGatePassed,
             config.getSuspicionThreshold(),
             config.getHighConfidenceThreshold()
         );

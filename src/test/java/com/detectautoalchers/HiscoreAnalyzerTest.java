@@ -126,6 +126,21 @@ public class HiscoreAnalyzerTest
         assertFalse(profile.hasClueOrCollectionLogActivity(5));
     }
 
+    @Test
+    public void unrankedActivitiesWithPositiveScoresAreRecorded()
+    {
+        Map<HiscoreSkill, Skill> skills = baseSkillMap(99);
+        skills.put(HiscoreSkill.CLUE_SCROLL_ALL, new Skill(-1, 1, -1));
+        skills.put(HiscoreSkill.COLLECTIONS_LOGGED, new Skill(-1, 35, -1));
+
+        HiscoreProfile profile = HiscoreAnalyzer.analyze(new HiscoreResult("player", skills), 21, 10, 2);
+
+        assertEquals(1, profile.getClueScrollCompletions());
+        assertEquals(35, profile.getCollectionLogItems());
+        assertEquals(36, profile.getClueAndCollectionLogTotal());
+        assertTrue(profile.hasClueOrCollectionLogActivity(5));
+    }
+
     private HiscoreResult result(int magicLevel, int highNonMagicSkills)
     {
         int[] nonMagicLevels = new int[highNonMagicSkills];

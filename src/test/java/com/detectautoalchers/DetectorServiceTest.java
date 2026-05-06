@@ -219,6 +219,23 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void doesNotFlagWithoutAlchemyBehaviorEvenWhenScoreIsHigh()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Idle Staff", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.applyHiscore(name, HiscoreProfile.found(99, 1, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Idle Staff"));
+        assertEquals(DetectionConfidence.NONE, service.getConfidence("Idle Staff"));
+    }
+
+    @Test
     public void suppressedNamesAreExcludedFromResults()
     {
         DetectorService service = new DetectorService();
