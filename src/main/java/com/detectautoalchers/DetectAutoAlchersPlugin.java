@@ -24,6 +24,7 @@ import net.runelite.api.PlayerComposition;
 import net.runelite.api.WorldView;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
+import net.runelite.api.events.BeforeMenuRender;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.MenuOpened;
@@ -270,8 +271,9 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Subscribe
     public void onMenuOpened(MenuOpened event)
     {
+        MenuEntry[] menuEntries = event.getMenuEntries();
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
-        if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(event.getMenuEntries()))
+        if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(menuEntries))
         {
             refreshPanel(System.currentTimeMillis());
         }
@@ -282,11 +284,24 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         MenuHighlighter.highlight(
-            event.getMenuEntries(),
+            menuEntries,
             detectorService.getSuspiciousConfidenceByName(),
             reportedPlayerStore.getNormalizedNames(),
             config.reportedPlayerHighlightColor()
         );
+    }
+
+    @Subscribe
+    public void onBeforeMenuRender(BeforeMenuRender event)
+    {
+        if (!config.sortMenuEntriesByConfidence())
+        {
+            return;
+        }
+
+        MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
+        MenuHighlighter.sortByConfidence(menuEntries, detectorService.getSuspiciousConfidenceByName());
+        client.getMenu().setMenuEntries(menuEntries);
     }
 
     @Subscribe

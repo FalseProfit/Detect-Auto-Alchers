@@ -208,10 +208,22 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "sortMenuEntriesByConfidence",
+        name = "Sort menu entries",
+        description = "Sort right-click player menu entries by detection confidence: high first, then moderate, then unflagged. Default: on.",
+        position = 13,
+        section = basicSection
+    )
+    default boolean sortMenuEntriesByConfidence()
+    {
+        return true;
+    }
+
+    @ConfigItem(
         keyName = "persistReportedPlayers",
         name = "Persist reported players",
         description = "Save reported players locally so they are not suggested again after restarting RuneLite. Default: on.",
-        position = 13,
+        position = 14,
         section = basicSection
     )
     default boolean persistReportedPlayers()
@@ -223,7 +235,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "highlightReportedPlayers",
         name = "Highlight reported players",
         description = "Draw a separate outline around players already saved in local report history. Default: on.",
-        position = 14,
+        position = 15,
         section = basicSection
     )
     default boolean highlightReportedPlayers()
@@ -235,7 +247,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "reportedPlayerHighlightColor",
         name = "Reported highlight color",
         description = "Outline color for players already saved in local report history. Default: RGB 144,238,144.",
-        position = 15,
+        position = 16,
         section = basicSection
     )
     default Color reportedPlayerHighlightColor()

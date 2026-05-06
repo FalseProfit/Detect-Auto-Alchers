@@ -1,7 +1,9 @@
 package com.detectautoalchers;
 
 import java.awt.Color;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +39,16 @@ final class MenuHighlighter
     static void highlight(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
     {
         highlight(menuEntries, confidenceByName, Collections.emptySet(), null);
+    }
+
+    static void sortByConfidence(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
+    {
+        if (menuEntries == null || confidenceByName == null || confidenceByName.isEmpty())
+        {
+            return;
+        }
+
+        Arrays.sort(menuEntries, Comparator.comparingInt(entry -> menuPriority(entry, confidenceByName)));
     }
 
     static void highlight(
@@ -154,6 +166,20 @@ final class MenuHighlighter
 
         String matchingName = findMatchingSuspiciousName(entry.getTarget(), confidenceByName.keySet());
         return confidenceByName.getOrDefault(matchingName, DetectionConfidence.NONE);
+    }
+
+    private static int menuPriority(MenuEntry entry, Map<String, DetectionConfidence> confidenceByName)
+    {
+        DetectionConfidence confidence = entry == null ? DetectionConfidence.NONE : confidenceFor(entry, confidenceByName);
+        if (confidence == DetectionConfidence.HIGH)
+        {
+            return 2;
+        }
+        if (confidence == DetectionConfidence.MODERATE)
+        {
+            return 1;
+        }
+        return 0;
     }
 
     private static Color reportedColorFor(MenuEntry entry, Set<String> reportedNames, Color reportedColor)

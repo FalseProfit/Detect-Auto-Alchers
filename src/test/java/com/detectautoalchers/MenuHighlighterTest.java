@@ -2,11 +2,14 @@ package com.detectautoalchers;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.awt.Color;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import net.runelite.api.MenuEntry;
 import org.junit.Test;
@@ -60,6 +63,40 @@ public class MenuHighlighterTest
     }
 
     @Test
+    public void sortsHighConfidencePlayersLastInMenuArrayForVisibleTopOrder()
+    {
+        Map<String, DetectionConfidence> confidenceByName = new LinkedHashMap<>();
+        confidenceByName.put("high bot", DetectionConfidence.HIGH);
+        confidenceByName.put("maybe bot", DetectionConfidence.MODERATE);
+        MenuEntry walkHere = testMenuEntry("Walk here", "");
+        MenuEntry unflagged = testMenuEntry("Report", "<col=ffffff>Regular Player<col=ff0000> (level-3)");
+        MenuEntry moderate = testMenuEntry("Report", "<col=ffffff>Maybe Bot<col=ff0000> (level-3)");
+        MenuEntry high = testMenuEntry("Report", "<col=ffffff>High Bot<col=ff0000> (level-3)");
+        MenuEntry[] entries = {high, unflagged, moderate, walkHere};
+
+        MenuHighlighter.sortByConfidence(entries, confidenceByName);
+
+        assertSame(unflagged, entries[0]);
+        assertSame(walkHere, entries[1]);
+        assertSame(moderate, entries[2]);
+        assertSame(high, entries[3]);
+    }
+
+    @Test
+    public void preservesRelativeOrderWithinSameConfidence()
+    {
+        Map<String, DetectionConfidence> confidenceByName = Collections.singletonMap("auto bot", DetectionConfidence.HIGH);
+        MenuEntry firstHigh = testMenuEntry("Trade with", "<col=ffffff>Auto Bot<col=ff0000> (level-3)");
+        MenuEntry secondHigh = testMenuEntry("Report", "<col=ffffff>Auto Bot<col=ff0000> (level-3)");
+        MenuEntry[] entries = {firstHigh, secondHigh};
+
+        MenuHighlighter.sortByConfidence(entries, confidenceByName);
+
+        assertSame(firstHigh, entries[0]);
+        assertSame(secondHigh, entries[1]);
+    }
+
+    @Test
     public void extractsPlayerNameFromTaggedReportTarget()
     {
         assertEquals("Auto Bot", MenuHighlighter.extractPlayerNameFromTarget("<col=ffffff>Auto Bot<col=ffff00> (level-3)"));
@@ -109,6 +146,12 @@ public class MenuHighlighterTest
                         return proxy;
                     case "getPlayer":
                         return null;
+                    case "toString":
+                        return values[0] + " " + values[1];
+                    case "hashCode":
+                        return System.identityHashCode(proxy);
+                    case "equals":
+                        return proxy == args[0];
                     default:
                         throw new UnsupportedOperationException(method.getName());
                 }
