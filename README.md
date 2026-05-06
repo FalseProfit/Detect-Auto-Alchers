@@ -6,31 +6,70 @@ The plugin is informational only. It does not report players, click menu options
 
 ## Detection model
 
-The plugin scores each nearby player with configurable evidence:
+The plugin tracks nearby players inside the configured radius and scores them with configurable evidence:
 
 - Fire staff evidence, defaulting to the basic staff of fire.
 - Repeated alchemy-like animation or spot-animation observations within a time window.
-- A Magic-dominant hiscore profile, where Magic is raised and most other skills remain low.
+- A Magic-dominant hiscore profile, where Magic is raised and only a configurable number of other skills are above the configured other-skill threshold.
+- A high-Magic bonus for accounts still alching at or above the configured high-Magic level.
 - A cadence bonus for repeated alchemy observations at a consistent game-tick interval.
 - Score reductions for accounts with enough non-Magic total level or combined clue-scroll completions and collection-log items to look less like fresh alching accounts.
 
+Repeated alchemy behavior is always required before a player can be highlighted. When the staff requirement is enabled, staff evidence is also required before a scored player can become a suspect.
+
 RuneLite does not expose a semantic "other player cast High Alchemy" event. Detection is therefore inferred from observable player state.
+
+## User-facing behavior
+
+- The scene overlay outlines high-confidence suspects in red and moderate-confidence suspects in yellow.
+- The plugin side panel lists current suspects, confidence, score, casts, hiscore evidence, reductions, world, distance, and time since last seen.
+- Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
+- Right-click player menu entries are sorted by confidence when menu sorting is enabled: high confidence first, then moderate confidence, then unflagged entries.
+- When you click RuneLite's normal Report option, the plugin suppresses that player from future suspect highlighting. If reported-player persistence is enabled, the player is also saved locally across restarts.
+- Previously reported players can be outlined and menu-colored with a separate configurable reported-player color.
+- The side panel includes a Clear reported history button for local reported-player history.
+- Players on the RuneLite ignore list are suppressed.
+- Mobile-client players can be suppressed after their mobile icon is observed in the right-click menu.
+
+The plugin never submits reports automatically.
 
 ## Default settings
 
-- Radius: 15 tiles
+- Detection radius: 15 tiles
 - Observation window: 60 seconds
 - Cast threshold: 5 observations
 - Moderate confidence threshold: 80
 - High confidence margin: +30, for an effective high confidence threshold of 110
-- Staff requirement: enabled
+- Require fire staff: enabled
 - Broad fire-rune staff matching: disabled
-- Hiscore scoring: enabled
-- High-Magic scoring: enabled for Magic level 99
-- Non-Magic total reduction threshold: 150
-- Clue/collection-log reduction threshold: more than 5 combined entries
-- High-confidence suspects are highlighted red; moderate-confidence suspects are highlighted yellow
+- Ignore mobile players: enabled
+- Hiscore lookup retry cooldown: 3 minutes
+- Alchemy animation IDs: `713`
+- Alchemy spot-animation IDs: `112,113`
+- Scene overlay: enabled
+- Menu coloring: enabled
+- Menu sorting by confidence: enabled
 - Persistent reported-player history: enabled
+- Reported-player highlighting: enabled
+- Reported-player highlight color: RGB `144,238,144`
+- Hiscore scoring: enabled
+- Magic-dominant threshold: Magic level 21
+- Other-skill threshold: level 50
+- Allowed other skills above threshold: 2
+- High-Magic scoring: enabled at Magic level 99
+- High-Magic score: +100
+- Non-Magic total reduction: enabled
+- Non-Magic total reduction threshold: 150
+- Non-Magic total reduction penalty: -100
+- Clue/collection-log reduction threshold: more than 5 combined entries
+- Clue/collection-log reduction penalty: -100
+
+Built-in score values:
+
+- Basic staff evidence: +30
+- Repeated alchemy behavior: +50
+- Magic-dominant hiscore profile: +30
+- Consistent cadence: +10
 
 The animation and spot-animation ID lists are configurable. The defaults are seeded for Low/High Alchemy-style observations and should be validated in a RuneLite developer client.
 
@@ -40,7 +79,7 @@ Reported players are saved locally at:
 ~/.runelite/detect-auto-alchers/reported-players.csv
 ```
 
-The CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players are suppressed from future red suspect highlighting and can optionally be outlined with a separate configurable reported-player color.
+The CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players are suppressed from future suspect highlighting and can optionally be outlined with a separate configurable reported-player color.
 
 ## Development
 
@@ -52,3 +91,12 @@ Install a JDK 11+ and run:
 ```
 
 The `run` task starts RuneLite in developer mode with this external plugin loaded.
+
+Two helper scripts are available for local sideload testing:
+
+```sh
+scripts/install-sideloaded-plugin.zsh
+scripts/run-sideloaded-runelite.zsh
+```
+
+`install-sideloaded-plugin.zsh` runs tests, builds the plugin jar, and copies it to `~/.runelite/sideloaded-plugins`. `run-sideloaded-runelite.zsh` launches a locally installed RuneLite client from `~/.runelite/repository2` in developer mode.
