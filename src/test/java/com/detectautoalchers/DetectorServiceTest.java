@@ -297,6 +297,61 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void zeroCastThresholdFlagsIdleStaffWhenScoreMeetsThreshold()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 60);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Idle Score Bot", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertEquals("Idle Score Bot", suspects.get(0).getDisplayName());
+        assertEquals(DetectionConfidence.MODERATE, suspects.get(0).getConfidence());
+        assertEquals(60, suspects.get(0).getScore());
+        assertEquals(0, suspects.get(0).getCastCount());
+        assertFalse(suspects.get(0).isBehaviorMatch());
+    }
+
+    @Test
+    public void positiveCastThresholdStillRequiresAlchemyBehavior()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(5, 60);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Idle Score Bot", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, true));
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertFalse(service.isSuspicious("Idle Score Bot"));
+        assertEquals(DetectionConfidence.NONE, service.getConfidence("Idle Score Bot"));
+        assertEquals(Integer.valueOf(60), service.getScoresByName().get("idle score bot"));
+    }
+
+    @Test
+    public void zeroCastThresholdDoesNotGrantBehaviorScore()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 60);
+        long now = 10_000L;
+
+        service.updatePlayer("Staff Only", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+
+        service.recompute(config, now + 3_000L);
+
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertEquals(Integer.valueOf(30), service.getScoresByName().get("staff only"));
+        assertFalse(service.isSuspicious("Staff Only"));
+    }
+
+    @Test
     public void suppressedNamesAreExcludedFromResults()
     {
         DetectorService service = new DetectorService();
@@ -475,6 +530,37 @@ public class DetectorServiceTest
             5,
             moderateThreshold,
             highThreshold,
+            true,
+            false,
+            true,
+            true,
+            53,
+            10,
+            2,
+            true,
+            99,
+            100,
+            true,
+            125,
+            100,
+            5,
+            100,
+            15 * 60_000L,
+            IdListParser.parse("713"),
+            IdListParser.parse("112,113"),
+            true,
+            true
+        );
+    }
+
+    private DetectorConfigSnapshot configWithCastAndModerateThreshold(int castThreshold, int moderateThreshold)
+    {
+        return new DetectorConfigSnapshot(
+            15,
+            60_000L,
+            castThreshold,
+            moderateThreshold,
+            moderateThreshold + 30,
             true,
             false,
             true,

@@ -70,11 +70,11 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "castThreshold",
         name = "Cast threshold",
-        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Default: 5 observations.",
+        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Set to 0 to allow score-only detection without requiring recent casts. Default: 5 observations.",
         position = 2,
         section = basicSection
     )
-    @Range(min = 1, max = 100)
+    @Range(min = 0, max = 100)
     default int castThreshold()
     {
         return 5;
