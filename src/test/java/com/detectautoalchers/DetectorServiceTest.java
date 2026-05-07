@@ -280,6 +280,25 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void magicBelow99DoesNotReceiveHighMagicScore()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Almost Maxed Magic", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Almost Maxed Magic", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(98, 2, 40, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertFalse(suspects.get(0).isHighMagic());
+        assertEquals(120, suspects.get(0).getScore());
+    }
+
+    @Test
     public void doesNotFlagWithoutAlchemyBehaviorEvenWhenScoreIsHigh()
     {
         DetectorService service = new DetectorService();
@@ -476,7 +495,6 @@ public class DetectorServiceTest
             10,
             2,
             true,
-            99,
             100,
             true,
             125,
@@ -507,7 +525,6 @@ public class DetectorServiceTest
             10,
             2,
             true,
-            99,
             100,
             true,
             125,
@@ -538,7 +555,6 @@ public class DetectorServiceTest
             10,
             2,
             true,
-            99,
             100,
             true,
             125,
@@ -569,7 +585,6 @@ public class DetectorServiceTest
             10,
             2,
             true,
-            99,
             100,
             true,
             125,

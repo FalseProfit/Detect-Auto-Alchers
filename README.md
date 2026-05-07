@@ -11,7 +11,7 @@ The plugin tracks nearby players inside the configured radius and scores them wi
 - Fire staff evidence, defaulting to the basic staff of fire.
 - Repeated alchemy-like animation or spot-animation observations within a time window.
 - A minimum Magic level gate for found hiscore profiles, plus a Magic-dominant hiscore bonus where Magic is raised and only a configurable number of other skills are above the configured other-skill threshold.
-- A high-Magic bonus for accounts still alching at or above the configured high-Magic level.
+- A high-Magic bonus for accounts still alching at 99 Magic.
 - A cadence bonus for repeated alchemy observations at a consistent game-tick interval.
 - Score reductions for accounts with enough non-Magic total level or combined clue-scroll completions and collection-log items to look less like fresh alching accounts.
 

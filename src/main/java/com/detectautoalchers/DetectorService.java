@@ -312,7 +312,7 @@ final class DetectorService
         boolean highMagic = config.isEnableHiscoreScoring()
             && !belowMagicThreshold
             && config.isEnableMaxMagicScoring()
-            && hiscoreProfile.isAtLeastMagicLevel(config.getMaxMagicLevelThreshold());
+            && hiscoreProfile.isAtLeastMagicLevel(DetectorConfigSnapshot.HIGH_MAGIC_LEVEL);
         boolean consistentCadence = behaviorMatch && evidence.hasConsistentCadence(
             nowMillis,
             config.getObservationWindowMillis(),

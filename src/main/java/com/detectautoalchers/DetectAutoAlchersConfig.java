@@ -329,7 +329,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "enableMaxMagicScoring",
         name = "99 Magic scoring",
-        description = "Add extra score for accounts still alching at or above the configured high-Magic level. Why would real players alch past 99? Default: on.",
+        description = "Add extra score for accounts still alching at 99 Magic. Why would real players alch past 99? Default: on.",
         position = 4,
         section = scoreIncreasesSection
     )
@@ -339,23 +339,10 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
-        keyName = "maxMagicLevelThreshold",
-        name = "High Magic threshold",
-        description = "Magic level at or above which high-Magic scoring applies. This almost certainly does not need to be a configurable value. Likely TODO: remove configurable value and hardcode magic level 99. Default: 99.",
-        position = 5,
-        section = scoreIncreasesSection
-    )
-    @Range(min = 1, max = 99)
-    default int maxMagicLevelThreshold()
-    {
-        return 99;
-    }
-
-    @ConfigItem(
         keyName = "maxMagicScore",
         name = "High Magic score",
-        description = "Detection score added for accounts at or above the high-Magic threshold. Why would real players alch past 99? High likelihood of botting. Default: +100.",
-        position = 6,
+        description = "Detection score added for accounts at 99 Magic. Why would real players alch past 99? High likelihood of botting. Default: +100.",
+        position = 5,
         section = scoreIncreasesSection
     )
     @Range(min = 0, max = 200)

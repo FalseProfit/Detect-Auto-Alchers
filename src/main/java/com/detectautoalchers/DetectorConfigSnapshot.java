@@ -9,6 +9,7 @@ final class DetectorConfigSnapshot
     static final int BEHAVIOR_SCORE = 50;
     static final int HISCORE_SCORE = 30;
     static final int CADENCE_SCORE = 10;
+    static final int HIGH_MAGIC_LEVEL = 99;
 
     private final int radius;
     private final long observationWindowMillis;
@@ -23,7 +24,6 @@ final class DetectorConfigSnapshot
     private final int nonMagicSkillThreshold;
     private final int allowedNonMagicSkillsAboveThreshold;
     private final boolean enableMaxMagicScoring;
-    private final int maxMagicLevelThreshold;
     private final int maxMagicScore;
     private final boolean enableMatureAccountSuppression;
     private final int nonMagicTotalLevelSuppressionThreshold;
@@ -50,7 +50,6 @@ final class DetectorConfigSnapshot
         int nonMagicSkillThreshold,
         int allowedNonMagicSkillsAboveThreshold,
         boolean enableMaxMagicScoring,
-        int maxMagicLevelThreshold,
         int maxMagicScore,
         boolean enableMatureAccountSuppression,
         int nonMagicTotalLevelSuppressionThreshold,
@@ -76,7 +75,6 @@ final class DetectorConfigSnapshot
         this.nonMagicSkillThreshold = nonMagicSkillThreshold;
         this.allowedNonMagicSkillsAboveThreshold = allowedNonMagicSkillsAboveThreshold;
         this.enableMaxMagicScoring = enableMaxMagicScoring;
-        this.maxMagicLevelThreshold = maxMagicLevelThreshold;
         this.maxMagicScore = maxMagicScore;
         this.enableMatureAccountSuppression = enableMatureAccountSuppression;
         this.nonMagicTotalLevelSuppressionThreshold = nonMagicTotalLevelSuppressionThreshold;
@@ -107,7 +105,6 @@ final class DetectorConfigSnapshot
             config.nonMagicSkillThreshold(),
             config.allowedNonMagicSkillsAboveThreshold(),
             config.enableMaxMagicScoring(),
-            config.maxMagicLevelThreshold(),
             config.maxMagicScore(),
             config.enableMatureAccountSuppression(),
             config.nonMagicTotalLevelSuppressionThreshold(),
@@ -138,7 +135,6 @@ final class DetectorConfigSnapshot
             10,
             2,
             true,
-            99,
             100,
             true,
             125,
@@ -216,11 +212,6 @@ final class DetectorConfigSnapshot
     boolean isEnableMaxMagicScoring()
     {
         return enableMaxMagicScoring;
-    }
-
-    int getMaxMagicLevelThreshold()
-    {
-        return maxMagicLevelThreshold;
     }
 
     int getMaxMagicScore()
