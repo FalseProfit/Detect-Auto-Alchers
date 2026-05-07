@@ -121,8 +121,8 @@ public class MenuHighlighterTest
     public void detectsMobileClientIconAfterCombatLevel()
     {
         assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3)<img=23>"));
-        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Score: 120)<img=23>"));
-        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ff4040>Auto Bot (level-3) (Score: 120)</col><img=23>"));
+        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Alch Bot Score: 120)<img=23>"));
+        assertTrue(MenuHighlighter.hasMobileClientIcon("<col=ff4040>Auto Bot (level-3) (Alch Bot Score: 120)</col><img=23>"));
         assertFalse(MenuHighlighter.hasMobileClientIcon("<img=23><col=ffffff>Auto Bot<col=ff0000> (level-3)"));
         assertFalse(MenuHighlighter.hasMobileClientIcon("<col=ffffff>Auto Bot<col=ff0000> (level-3)"));
     }
@@ -137,7 +137,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Bot Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -150,7 +150,7 @@ public class MenuHighlighterTest
         MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.emptyMap(), 80, 110);
 
         assertEquals(
-            "<col=ffffff>Unknown Player<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Score: 0)", Color.WHITE),
+            "<col=ffffff>Unknown Player<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Alch Bot Score: 0)", Color.WHITE),
             entry.getTarget()
         );
     }
@@ -165,7 +165,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
+                + MenuHighlighter.colorText("(Alch Bot Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
                 + "<img=23>",
             entry.getTarget()
         );
@@ -181,7 +181,24 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Bot Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+            entry.getTarget()
+        );
+    }
+
+    @Test
+    public void replacesLegacyScoreLabelWithoutDuplicating()
+    {
+        MenuEntry entry = testMenuEntry(
+            "Report",
+            "<col=ffffff>Username<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Score: 120)", Color.WHITE)
+        );
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 140), 80, 110);
+
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Alch Bot Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -195,7 +212,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Score: 80)", MenuHighlighter.MODERATE_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Bot Score: 80)", MenuHighlighter.MODERATE_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -214,7 +231,7 @@ public class MenuHighlighterTest
         assertEquals(
             MenuHighlighter.colorText("Username (level-98)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
                 + " "
-                + MenuHighlighter.colorText("(Score: 0)", Color.WHITE),
+                + MenuHighlighter.colorText("(Alch Bot Score: 0)", Color.WHITE),
             entry.getTarget()
         );
     }
@@ -224,7 +241,7 @@ public class MenuHighlighterTest
     {
         assertEquals(
             "Auto Bot",
-            MenuHighlighter.extractPlayerNameFromTarget("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Score: 120)<img=23>")
+            MenuHighlighter.extractPlayerNameFromTarget("<col=ffffff>Auto Bot<col=ff0000> (level-3) (Alch Bot Score: 120)<img=23>")
         );
     }
 

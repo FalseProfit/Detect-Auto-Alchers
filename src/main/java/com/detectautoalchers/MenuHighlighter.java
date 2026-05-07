@@ -18,18 +18,24 @@ final class MenuHighlighter
     static final Color HIGH_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 64, 64);
     static final Color MODERATE_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 220, 64);
     private static final Color LOW_SCORE_COLOR = Color.WHITE;
+    private static final String SCORE_LABEL = "Alch Bot Score";
+    private static final String SCORE_LABEL_PATTERN = "(?:alch\\s+bot\\s+score|score)";
     private static final Pattern LEVEL_SUFFIX_WITH_TRAILING_ICON = Pattern.compile(
-        "(?i).*\\(level-\\d+\\)\\s*(?:\\(score:\\s*\\d+\\)\\s*)?(?:<img=\\d+>\\s*)+$"
+        "(?i).*\\(level-\\d+\\)\\s*(?:\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\)\\s*)?(?:<img=\\d+>\\s*)+$"
     );
-    private static final Pattern LEVEL_SUFFIX = Pattern.compile("(?i).*\\(level-\\d+\\)(?:\\s+\\(score:\\s*\\d+\\))?\\s*$");
+    private static final Pattern LEVEL_SUFFIX = Pattern.compile(
+        "(?i).*\\(level-\\d+\\)(?:\\s+\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\))?\\s*$"
+    );
     private static final Pattern SCORE_SUFFIX = Pattern.compile(
-        "(?i)\\s*(?:<col=[0-9a-f]+>)?\\(score:\\s*\\d+\\)(?:</col>)?(\\s*(?:<img=\\d+>\\s*)*)$"
+        "(?i)\\s*(?:<col=[0-9a-f]+>)?\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\)(?:</col>)?(\\s*(?:<img=\\d+>\\s*)*)$"
     );
-    private static final Pattern SCORE_SUFFIX_TEXT = Pattern.compile("(?i)\\s+\\(score:\\s*\\d+\\)\\s*$");
+    private static final Pattern SCORE_SUFFIX_TEXT = Pattern.compile(
+        "(?i)\\s+\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\)\\s*$"
+    );
     private static final Pattern COLOR_TAGS = Pattern.compile("(?i)</?col(?:=[0-9a-f]+)?>");
     private static final Pattern TRAILING_IMAGE_TAGS = Pattern.compile("(?i)(?:\\s*<img=\\d+>)+\\s*$");
     private static final Pattern TRAILING_SCORE_WITH_OPTIONAL_IMAGES = Pattern.compile(
-        "(?i)(\\s*(?:<col=[0-9a-f]+>)?\\(score:\\s*\\d+\\)(?:</col>)?)(\\s*(?:<img=\\d+>\\s*)*)$"
+        "(?i)(\\s*(?:<col=[0-9a-f]+>)?\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\)(?:</col>)?)(\\s*(?:<img=\\d+>\\s*)*)$"
     );
 
     private MenuHighlighter()
@@ -308,7 +314,7 @@ final class MenuHighlighter
 
     private static String formatScore(int score, int moderateThreshold, int highThreshold)
     {
-        return colorText("(Score: " + score + ")", scoreColor(score, moderateThreshold, highThreshold));
+        return colorText("(" + SCORE_LABEL + ": " + score + ")", scoreColor(score, moderateThreshold, highThreshold));
     }
 
     private static Color scoreColor(int score, int moderateThreshold, int highThreshold)
