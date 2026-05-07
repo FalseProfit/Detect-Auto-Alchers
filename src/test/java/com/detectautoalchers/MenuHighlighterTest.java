@@ -133,9 +133,13 @@ public class MenuHighlighterTest
         MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
         Map<String, Integer> scoresByName = Collections.singletonMap("username", 120);
 
-        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName);
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName, 80, 110);
 
-        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 120)", entry.getTarget());
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+            entry.getTarget()
+        );
     }
 
     @Test
@@ -143,9 +147,12 @@ public class MenuHighlighterTest
     {
         MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Unknown Player<col=ff0000> (level-98)");
 
-        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.emptyMap());
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.emptyMap(), 80, 110);
 
-        assertEquals("<col=ffffff>Unknown Player<col=ff0000> (level-98) (Score: 0)", entry.getTarget());
+        assertEquals(
+            "<col=ffffff>Unknown Player<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Score: 0)", Color.WHITE),
+            entry.getTarget()
+        );
     }
 
     @Test
@@ -154,9 +161,14 @@ public class MenuHighlighterTest
         MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)<img=23>");
         Map<String, Integer> scoresByName = Collections.singletonMap("username", 120);
 
-        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName);
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, scoresByName, 80, 110);
 
-        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 120)<img=23>", entry.getTarget());
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
+                + "<img=23>",
+            entry.getTarget()
+        );
     }
 
     @Test
@@ -164,10 +176,47 @@ public class MenuHighlighterTest
     {
         MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
 
-        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 120));
-        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 140));
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 120), 80, 110);
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 140), 80, 110);
 
-        assertEquals("<col=ffffff>Username<col=ff0000> (level-98) (Score: 140)", entry.getTarget());
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+            entry.getTarget()
+        );
+    }
+
+    @Test
+    public void appendsModerateDetectionScoreWithModerateColor()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 80), 80, 110);
+
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Score: 80)", MenuHighlighter.MODERATE_CONFIDENCE_HIGHLIGHT_COLOR),
+            entry.getTarget()
+        );
+    }
+
+    @Test
+    public void preservesScoreColorWhenHighlightingTarget()
+    {
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 0), 80, 110);
+        MenuHighlighter.highlight(
+            new MenuEntry[]{entry},
+            Collections.singletonMap("username", DetectionConfidence.HIGH)
+        );
+
+        assertEquals(
+            MenuHighlighter.colorText("Username (level-98)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
+                + " "
+                + MenuHighlighter.colorText("(Score: 0)", Color.WHITE),
+            entry.getTarget()
+        );
     }
 
     @Test

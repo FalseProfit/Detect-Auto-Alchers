@@ -283,7 +283,12 @@ public class DetectAutoAlchersPlugin extends Plugin
 
         if (config.showMenuDetectionScores())
         {
-            MenuHighlighter.appendScores(menuEntries, detectorService.getScoresByName());
+            MenuHighlighter.appendScores(
+                menuEntries,
+                detectorService.getScoresByName(),
+                snapshot.getSuspicionThreshold(),
+                snapshot.getHighConfidenceThreshold()
+            );
         }
 
         if (!snapshot.isColorMenuEntries())

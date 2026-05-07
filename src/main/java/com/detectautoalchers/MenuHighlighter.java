@@ -17,14 +17,20 @@ final class MenuHighlighter
 {
     static final Color HIGH_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 64, 64);
     static final Color MODERATE_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 220, 64);
+    private static final Color LOW_SCORE_COLOR = Color.WHITE;
     private static final Pattern LEVEL_SUFFIX_WITH_TRAILING_ICON = Pattern.compile(
         "(?i).*\\(level-\\d+\\)\\s*(?:\\(score:\\s*\\d+\\)\\s*)?(?:<img=\\d+>\\s*)+$"
     );
     private static final Pattern LEVEL_SUFFIX = Pattern.compile("(?i).*\\(level-\\d+\\)(?:\\s+\\(score:\\s*\\d+\\))?\\s*$");
-    private static final Pattern SCORE_SUFFIX = Pattern.compile("(?i)\\s*\\(score:\\s*\\d+\\)(\\s*(?:<img=\\d+>\\s*)*)$");
+    private static final Pattern SCORE_SUFFIX = Pattern.compile(
+        "(?i)\\s*(?:<col=[0-9a-f]+>)?\\(score:\\s*\\d+\\)(?:</col>)?(\\s*(?:<img=\\d+>\\s*)*)$"
+    );
     private static final Pattern SCORE_SUFFIX_TEXT = Pattern.compile("(?i)\\s+\\(score:\\s*\\d+\\)\\s*$");
     private static final Pattern COLOR_TAGS = Pattern.compile("(?i)</?col(?:=[0-9a-f]+)?>");
     private static final Pattern TRAILING_IMAGE_TAGS = Pattern.compile("(?i)(?:\\s*<img=\\d+>)+\\s*$");
+    private static final Pattern TRAILING_SCORE_WITH_OPTIONAL_IMAGES = Pattern.compile(
+        "(?i)(\\s*(?:<col=[0-9a-f]+>)?\\(score:\\s*\\d+\\)(?:</col>)?)(\\s*(?:<img=\\d+>\\s*)*)$"
+    );
 
     private MenuHighlighter()
     {
@@ -55,7 +61,11 @@ final class MenuHighlighter
         Arrays.sort(menuEntries, Comparator.comparingInt(entry -> menuPriority(entry, confidenceByName)));
     }
 
-    static void appendScores(MenuEntry[] menuEntries, Map<String, Integer> scoresByName)
+    static void appendScores(
+        MenuEntry[] menuEntries,
+        Map<String, Integer> scoresByName,
+        int moderateThreshold,
+        int highThreshold)
     {
         if (menuEntries == null)
         {
@@ -72,7 +82,7 @@ final class MenuHighlighter
 
             String normalizedName = normalizedPlayerName(entry);
             int score = scores.getOrDefault(normalizedName, 0);
-            entry.setTarget(appendScore(entry.getTarget(), score));
+            entry.setTarget(appendScore(entry.getTarget(), score, moderateThreshold, highThreshold));
         }
     }
 
@@ -156,14 +166,17 @@ final class MenuHighlighter
 
     static String colorTarget(String target, Color color)
     {
+        ScoreSuffix scoreSuffix = splitScoreSuffix(target);
         String trailingImages = "";
-        java.util.regex.Matcher matcher = TRAILING_IMAGE_TAGS.matcher(target == null ? "" : target);
+        String targetWithoutScore = scoreSuffix.body;
+        java.util.regex.Matcher matcher = TRAILING_IMAGE_TAGS.matcher(targetWithoutScore);
         if (matcher.find())
         {
             trailingImages = matcher.group().trim();
+            targetWithoutScore = targetWithoutScore.substring(0, matcher.start()).replaceFirst("\\s+$", "");
         }
 
-        return colorText(cleanText(target), color) + trailingImages;
+        return colorText(cleanText(targetWithoutScore), color) + scoreSuffix.scoreText + trailingImages + scoreSuffix.trailingImages;
     }
 
     static String colorText(String text)
@@ -269,7 +282,7 @@ final class MenuHighlighter
         return DetectorService.normalizeName(extractPlayerNameFromTarget(entry.getTarget()));
     }
 
-    private static String appendScore(String target, int score)
+    private static String appendScore(String target, int score, int moderateThreshold, int highThreshold)
     {
         if (target == null || target.isEmpty())
         {
@@ -280,16 +293,63 @@ final class MenuHighlighter
         java.util.regex.Matcher matcher = TRAILING_IMAGE_TAGS.matcher(withoutExistingScore);
         if (!matcher.find())
         {
-            return withoutExistingScore + " (Score: " + score + ")";
+            return withoutExistingScore + " " + formatScore(score, moderateThreshold, highThreshold);
         }
 
         String body = withoutExistingScore.substring(0, matcher.start()).replaceFirst("\\s+$", "");
         String trailingImages = matcher.group().trim();
-        return body + " (Score: " + score + ")" + trailingImages;
+        return body + " " + formatScore(score, moderateThreshold, highThreshold) + trailingImages;
     }
 
     private static String stripColorTags(String target)
     {
         return COLOR_TAGS.matcher(target).replaceAll("");
+    }
+
+    private static String formatScore(int score, int moderateThreshold, int highThreshold)
+    {
+        return colorText("(Score: " + score + ")", scoreColor(score, moderateThreshold, highThreshold));
+    }
+
+    private static Color scoreColor(int score, int moderateThreshold, int highThreshold)
+    {
+        if (score >= highThreshold)
+        {
+            return HIGH_CONFIDENCE_HIGHLIGHT_COLOR;
+        }
+        if (score >= moderateThreshold)
+        {
+            return MODERATE_CONFIDENCE_HIGHLIGHT_COLOR;
+        }
+        return LOW_SCORE_COLOR;
+    }
+
+    private static ScoreSuffix splitScoreSuffix(String target)
+    {
+        String value = target == null ? "" : target;
+        java.util.regex.Matcher matcher = TRAILING_SCORE_WITH_OPTIONAL_IMAGES.matcher(value);
+        if (!matcher.find())
+        {
+            return new ScoreSuffix(value, "", "");
+        }
+
+        String body = value.substring(0, matcher.start()).replaceFirst("\\s+$", "");
+        String scoreText = matcher.group(1);
+        String trailingImages = matcher.group(2).trim();
+        return new ScoreSuffix(body, scoreText, trailingImages);
+    }
+
+    private static final class ScoreSuffix
+    {
+        private final String body;
+        private final String scoreText;
+        private final String trailingImages;
+
+        private ScoreSuffix(String body, String scoreText, String trailingImages)
+        {
+            this.body = body;
+            this.scoreText = scoreText;
+            this.trailingImages = trailingImages;
+        }
     }
 }
