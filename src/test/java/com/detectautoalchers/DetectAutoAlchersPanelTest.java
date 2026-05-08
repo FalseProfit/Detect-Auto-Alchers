@@ -42,7 +42,19 @@ public class DetectAutoAlchersPanelTest
             431,
             2,
             StaffClassifier.STAFF_OF_FIRE,
-            1_000L
+            1_000L,
+            new ScoreBreakdown(
+                30,
+                50,
+                30,
+                0,
+                10,
+                0,
+                0,
+                true,
+                true,
+                true
+            )
         );
 
         SwingUtilities.invokeAndWait(() -> panel.refresh(Collections.singletonList(result), 2_000L));
@@ -51,6 +63,13 @@ public class DetectAutoAlchersPanelTest
         assertTrue(containsLabel(panel, "non-magic total: 40"));
         assertTrue(containsLabel(panel, "confidence: high"));
         assertTrue(containsLabel(panel, "score: 120"));
+        assertTrue(containsLabel(panel, "staff +30"));
+        assertTrue(containsLabel(panel, "casts +50"));
+        assertTrue(containsLabel(panel, "cadence +10"));
+        assertTrue(containsLabel(panel, "magic profile +30"));
+        assertTrue(containsLabel(panel, "cast gate: passed"));
+        assertTrue(containsLabel(panel, "staff gate: passed"));
+        assertTrue(containsLabel(panel, "hiscore status: found"));
         assertFalse(containsLabel(panel, "magic: 89  other"));
     }
 

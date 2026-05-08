@@ -143,21 +143,43 @@ final class DetectAutoAlchersPanel extends PluginPanel
         details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
         details.setOpaque(false);
         details.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ScoreBreakdown breakdown = suspect.getScoreBreakdown();
+
+        addSection(details, "Status");
         addDetail(details, "confidence: " + suspect.getConfidenceLabel());
-        addDetail(details, "score: " + suspect.getScore());
-        addDetail(details, "casts: " + suspect.getCastCount());
-        addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel()));
-        addDetail(details, "non-magic total: " + formatCount(suspect.getNonMagicTotalLevel()));
-        addDetail(details, "other skills: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
-        addDetail(details, "clues + collection log: " + formatCount(suspect.getClueAndCollectionLogTotal()));
-        addDetail(details, "staff: " + yesNo(suspect.isStaffMatch()));
-        addDetail(details, "cadence: " + yesNo(suspect.isConsistentCadence()));
-        addDetail(details, "high magic: " + yesNo(suspect.isHighMagic()));
-        addDetail(details, "non-magic reduction: " + yesNo(suspect.isMatureAccountSuppressed()));
-        addDetail(details, "played activity: " + yesNo(suspect.isClueCollectionActivitySuppressed()));
         addDetail(details, "world: " + suspect.getWorld());
         addDetail(details, "distance: " + suspect.getDistance());
         addDetail(details, "seen: " + secondsSince(suspect.getLastSeenMillis(), nowMillis) + "s");
+
+        addSection(details, "Score");
+        addDetail(details, "score: " + suspect.getScore());
+        for (String label : breakdown.getScoreLabels())
+        {
+            addDetail(details, label);
+        }
+        addDetail(details, "positive total: " + breakdown.getPositiveTotal());
+        addDetail(details, "penalties: -" + breakdown.getPenaltyTotal());
+
+        addSection(details, "Evidence");
+        addDetail(details, "casts: " + suspect.getCastCount());
+        addDetail(details, "magic: " + formatLevel(suspect.getMagicLevel()));
+        addDetail(details, "staff: " + yesNo(suspect.isStaffMatch()));
+        addDetail(details, "cadence: " + yesNo(suspect.isConsistentCadence()));
+        addDetail(details, "cast gate: " + passedFailed(breakdown.isCastGatePassed()));
+        addDetail(details, "staff gate: " + passedFailed(breakdown.isStaffGatePassed()));
+        addDetail(details, "detection gate: " + passedFailed(breakdown.isDetectionGatePassed()));
+
+        addSection(details, "Hiscores");
+        addDetail(details, "hiscore status: " + suspect.getHiscoreStatus());
+        addDetail(details, "magic profile: " + yesNo(suspect.isMagicDominant()));
+        addDetail(details, "high magic: " + yesNo(suspect.isHighMagic()));
+        addDetail(details, "other skills: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
+        addDetail(details, "non-magic total: " + formatCount(suspect.getNonMagicTotalLevel()));
+        addDetail(details, "clues + collection log: " + formatCount(suspect.getClueAndCollectionLogTotal()));
+
+        addSection(details, "Reductions");
+        addDetail(details, "non-magic reduction: " + yesNo(suspect.isMatureAccountSuppressed()));
+        addDetail(details, "played activity: " + yesNo(suspect.isClueCollectionActivitySuppressed()));
         details.setMaximumSize(new Dimension(Integer.MAX_VALUE, details.getPreferredSize().height));
         row.add(details);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
@@ -173,9 +195,23 @@ final class DetectAutoAlchersPanel extends PluginPanel
         panel.add(label);
     }
 
+    private void addSection(JPanel panel, String text)
+    {
+        JLabel label = new JLabel(text);
+        label.setForeground(TEXT);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setBorder(BorderFactory.createEmptyBorder(6, 0, 2, 0));
+        panel.add(label);
+    }
+
     private String yesNo(boolean value)
     {
         return value ? "yes" : "no";
+    }
+
+    private String passedFailed(boolean value)
+    {
+        return value ? "passed" : "failed";
     }
 
     private String formatLevel(int level)

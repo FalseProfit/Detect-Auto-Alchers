@@ -12,6 +12,7 @@ import java.util.Set;
 
 final class DetectorService
 {
+    private static final int MAX_HISCORE_LOOKUPS_IN_FLIGHT = 3;
     private static final long STALE_MULTIPLIER = 2L;
     private final Map<String, PlayerEvidence> evidenceByName = new LinkedHashMap<>();
     private final Set<String> suppressedNames = new HashSet<>();
@@ -164,9 +165,15 @@ final class DetectorService
             return false;
         }
 
-        boolean candidate = staffMatches(evidence, config)
-            || evidence.getObservationCount(nowMillis, config.getObservationWindowMillis()) > 0;
+        int castCount = evidence.getObservationCount(nowMillis, config.getObservationWindowMillis());
+        boolean behaviorMatch = config.getCastThreshold() > 0 && castCount >= config.getCastThreshold();
+        boolean candidate = behaviorMatch || (staffMatches(evidence, config) && castCount > 0);
         if (!candidate)
+        {
+            return false;
+        }
+
+        if (!hasHiscoreLookupCapacity())
         {
             return false;
         }
@@ -181,6 +188,24 @@ final class DetectorService
         evidence.setHiscoreLookupInFlight(true);
         evidence.setHiscoreProfile(HiscoreProfile.pending());
         return true;
+    }
+
+    synchronized int getHiscoreLookupsInFlight()
+    {
+        int count = 0;
+        for (PlayerEvidence evidence : evidenceByName.values())
+        {
+            if (evidence.isHiscoreLookupInFlight())
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    synchronized boolean hasHiscoreLookupCapacity()
+    {
+        return getHiscoreLookupsInFlight() < MAX_HISCORE_LOOKUPS_IN_FLIGHT;
     }
 
     synchronized void applyHiscore(String normalizedName, HiscoreProfile hiscoreProfile)
@@ -319,36 +344,50 @@ final class DetectorService
             castThreshold
         );
 
+        int staffScore = 0;
+        int behaviorScore = 0;
+        int hiscoreScore = 0;
+        int highMagicScore = 0;
+        int cadenceScore = 0;
+        int matureAccountPenalty = 0;
+        int clueCollectionPenalty = 0;
+
         if (!belowMagicThreshold && staffMatch)
         {
-            score += DetectorConfigSnapshot.STAFF_SCORE;
+            staffScore = DetectorConfigSnapshot.STAFF_SCORE;
+            score += staffScore;
         }
 
         if (!belowMagicThreshold && behaviorMatch)
         {
-            score += DetectorConfigSnapshot.BEHAVIOR_SCORE;
+            behaviorScore = DetectorConfigSnapshot.BEHAVIOR_SCORE;
+            score += behaviorScore;
         }
 
         if (!belowMagicThreshold && magicDominant)
         {
-            score += DetectorConfigSnapshot.HISCORE_SCORE;
+            hiscoreScore = DetectorConfigSnapshot.HISCORE_SCORE;
+            score += hiscoreScore;
         }
 
         if (!belowMagicThreshold && highMagic)
         {
-            score += config.getMaxMagicScore();
+            highMagicScore = config.getMaxMagicScore();
+            score += highMagicScore;
         }
 
         if (!belowMagicThreshold && consistentCadence)
         {
-            score += DetectorConfigSnapshot.CADENCE_SCORE;
+            cadenceScore = DetectorConfigSnapshot.CADENCE_SCORE;
+            score += cadenceScore;
         }
 
         boolean matureAccountSuppressed = config.isEnableMatureAccountSuppression()
             && hiscoreProfile.isMatureAccount(config.getNonMagicTotalLevelSuppressionThreshold());
         if (matureAccountSuppressed)
         {
-            score = Math.max(0, score - config.getMatureAccountScorePenalty());
+            matureAccountPenalty = config.getMatureAccountScorePenalty();
+            score = Math.max(0, score - matureAccountPenalty);
         }
 
         boolean clueCollectionActivitySuppressed = hiscoreProfile.hasClueOrCollectionLogActivity(
@@ -356,10 +395,13 @@ final class DetectorService
         );
         if (clueCollectionActivitySuppressed)
         {
-            score = Math.max(0, score - config.getClueCollectionActivityScorePenalty());
+            clueCollectionPenalty = config.getClueCollectionActivityScorePenalty();
+            score = Math.max(0, score - clueCollectionPenalty);
         }
 
-        boolean detectionGatePassed = (castGateDisabled || behaviorMatch) && (!config.isRequireFireStaff() || staffMatch);
+        boolean castGatePassed = castGateDisabled || behaviorMatch;
+        boolean staffGatePassed = !config.isRequireFireStaff() || staffMatch;
+        boolean detectionGatePassed = castGatePassed && staffGatePassed;
         DetectionConfidence confidence = DetectionConfidence.fromScore(
             score,
             detectionGatePassed,
@@ -390,7 +432,19 @@ final class DetectorService
             evidence.getWorld(),
             evidence.getDistance(),
             evidence.getWeaponId(),
-            evidence.getLastSeenMillis()
+            evidence.getLastSeenMillis(),
+            new ScoreBreakdown(
+                staffScore,
+                behaviorScore,
+                hiscoreScore,
+                highMagicScore,
+                cadenceScore,
+                matureAccountPenalty,
+                clueCollectionPenalty,
+                castGatePassed,
+                staffGatePassed,
+                detectionGatePassed
+            )
         );
     }
 

@@ -25,6 +25,7 @@ final class SuspicionResult
     private final int distance;
     private final int weaponId;
     private final long lastSeenMillis;
+    private final ScoreBreakdown scoreBreakdown;
 
     SuspicionResult(
         String normalizedName,
@@ -51,6 +52,60 @@ final class SuspicionResult
         int weaponId,
         long lastSeenMillis)
     {
+        this(
+            normalizedName,
+            displayName,
+            score,
+            confidence,
+            castCount,
+            staffMatch,
+            behaviorMatch,
+            magicDominant,
+            highMagic,
+            consistentCadence,
+            magicLevel,
+            nonMagicSkillsAboveThreshold,
+            nonMagicTotalLevel,
+            matureAccountSuppressed,
+            clueScrollCompletions,
+            collectionLogItems,
+            clueAndCollectionLogTotal,
+            clueCollectionActivitySuppressed,
+            hiscoreStatus,
+            world,
+            distance,
+            weaponId,
+            lastSeenMillis,
+            ScoreBreakdown.empty()
+        );
+    }
+
+    SuspicionResult(
+        String normalizedName,
+        String displayName,
+        int score,
+        DetectionConfidence confidence,
+        int castCount,
+        boolean staffMatch,
+        boolean behaviorMatch,
+        boolean magicDominant,
+        boolean highMagic,
+        boolean consistentCadence,
+        int magicLevel,
+        int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        boolean matureAccountSuppressed,
+        int clueScrollCompletions,
+        int collectionLogItems,
+        int clueAndCollectionLogTotal,
+        boolean clueCollectionActivitySuppressed,
+        String hiscoreStatus,
+        int world,
+        int distance,
+        int weaponId,
+        long lastSeenMillis,
+        ScoreBreakdown scoreBreakdown)
+    {
         this.normalizedName = normalizedName;
         this.displayName = displayName;
         this.score = score;
@@ -74,6 +129,7 @@ final class SuspicionResult
         this.distance = distance;
         this.weaponId = weaponId;
         this.lastSeenMillis = lastSeenMillis;
+        this.scoreBreakdown = scoreBreakdown == null ? ScoreBreakdown.empty() : scoreBreakdown;
     }
 
     String getNormalizedName()
@@ -204,5 +260,36 @@ final class SuspicionResult
     long getLastSeenMillis()
     {
         return lastSeenMillis;
+    }
+
+    ScoreBreakdown getScoreBreakdown()
+    {
+        return scoreBreakdown;
+    }
+
+    String stableEvidenceKey()
+    {
+        return normalizedName
+            + "|" + confidence
+            + "|" + score
+            + "|" + castCount
+            + "|" + staffMatch
+            + "|" + behaviorMatch
+            + "|" + magicDominant
+            + "|" + highMagic
+            + "|" + consistentCadence
+            + "|" + magicLevel
+            + "|" + nonMagicSkillsAboveThreshold
+            + "|" + nonMagicTotalLevel
+            + "|" + matureAccountSuppressed
+            + "|" + clueScrollCompletions
+            + "|" + collectionLogItems
+            + "|" + clueAndCollectionLogTotal
+            + "|" + clueCollectionActivitySuppressed
+            + "|" + hiscoreStatus
+            + "|" + world
+            + "|" + distance
+            + "|" + weaponId
+            + "|" + scoreBreakdown.stableKey();
     }
 }

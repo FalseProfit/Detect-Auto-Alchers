@@ -54,6 +54,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private static final String CONFIG_GROUP = "detectautoalchers";
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
+    private static final long PANEL_REFRESH_INTERVAL_MILLIS = 5_000L;
 
     @Inject
     private Client client;
@@ -82,6 +83,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
     private final Set<String> mobilePlayerNames = new HashSet<>();
+    private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
 
     @Provides
     DetectAutoAlchersConfig provideConfig(ConfigManager configManager)
@@ -132,6 +134,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         panel = null;
+        panelRefreshGate.reset();
         mobilePlayerNames.clear();
         detectorService.clear();
     }
@@ -158,7 +161,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
         long nowMillis = System.currentTimeMillis();
         detectorService.recompute(DetectorConfigSnapshot.from(config), nowMillis);
-        refreshPanel(nowMillis);
+        refreshPanel(nowMillis, true);
     }
 
     @Subscribe
@@ -168,7 +171,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
         {
             detectorService.clearEvidence();
-            refreshPanel(System.currentTimeMillis());
+            refreshPanel(System.currentTimeMillis(), true);
         }
     }
 
@@ -278,7 +281,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
         if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(menuEntries))
         {
-            refreshPanel(System.currentTimeMillis());
+            refreshPanel(System.currentTimeMillis(), true);
         }
 
         if (config.showMenuDetectionScores())
@@ -328,7 +331,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         if (config.ignoreMobilePlayers() && MenuHighlighter.hasMobileClientIcon(event.getMenuTarget()))
         {
             suppressMobilePlayer(getReportedPlayerName(event));
-            refreshPanel(System.currentTimeMillis());
+            refreshPanel(System.currentTimeMillis(), true);
             return;
         }
 
@@ -338,7 +341,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             recordReportedPlayer(normalizedName, displayName);
             detectorService.suppressName(normalizedName);
-            refreshPanel(System.currentTimeMillis());
+            refreshPanel(System.currentTimeMillis(), true);
         }
     }
 
@@ -507,7 +510,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             {
                 detectorService.suppressNames(mobilePlayerNames);
             }
-            refreshPanel(System.currentTimeMillis());
+            refreshPanel(System.currentTimeMillis(), true);
         }
         catch (IOException ex)
         {
@@ -568,12 +571,22 @@ public class DetectAutoAlchersPlugin extends Plugin
 
     private void refreshPanel(long nowMillis)
     {
+        refreshPanel(nowMillis, false);
+    }
+
+    private void refreshPanel(long nowMillis, boolean force)
+    {
         if (panel == null)
         {
             return;
         }
 
         List<SuspicionResult> suspects = detectorService.getSuspiciousResults();
+        if (!panelRefreshGate.shouldRefresh(suspects, nowMillis, force))
+        {
+            return;
+        }
+
         panel.refresh(suspects, nowMillis);
     }
 

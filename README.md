@@ -83,7 +83,11 @@ The CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported 
 
 ## Development
 
-Install a JDK 11+ and run:
+Install JDK 11 for RuneLite plugin development. This project compiles Java 11-compatible bytecode via Gradle's `options.release.set(11)` setting.
+
+Gradle 8.10 can currently run on JDK 11, but Gradle 9 will require launching Gradle with JDK 17+. If the Gradle wrapper is upgraded later, keep the project compiling with Java 11 compatibility.
+
+Then run:
 
 ```sh
 ./gradlew test

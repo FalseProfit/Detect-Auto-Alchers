@@ -33,6 +33,13 @@ public class DetectorServiceTest
         assertTrue(suspects.get(0).isHighConfidence());
         assertEquals(DetectionConfidence.HIGH, service.getConfidence("Alch Bot"));
         assertEquals(120, suspects.get(0).getScore());
+        assertEquals(120, suspects.get(0).getScoreBreakdown().getPositiveTotal());
+        assertEquals(0, suspects.get(0).getScoreBreakdown().getPenaltyTotal());
+        assertEquals(120, suspects.get(0).getScoreBreakdown().getFinalTotal());
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("staff +30"));
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("casts +50"));
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("cadence +10"));
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("magic profile +30"));
     }
 
     @Test
@@ -277,6 +284,8 @@ public class DetectorServiceTest
         assertTrue(suspects.get(0).isHighMagic());
         assertTrue(suspects.get(0).isMatureAccountSuppressed());
         assertEquals(120, suspects.get(0).getScore());
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("99 magic +100"));
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("non-magic total -100"));
     }
 
     @Test
@@ -462,13 +471,92 @@ public class DetectorServiceTest
         DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
         long now = 10_000L;
         String name = service.updatePlayer("Lookup Me", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.recordAlchObservation("Lookup Me", "animation", 713, 100, now, config);
 
         assertTrue(service.markHiscoreLookupIfNeeded(name, config, now));
         assertFalse(service.markHiscoreLookupIfNeeded(name, config, now + 1_000L));
 
         service.applyHiscore(name, HiscoreProfile.error());
         assertFalse(service.markHiscoreLookupIfNeeded(name, config, now + 2_000L));
+        service.recordAlchObservation(
+            "Lookup Me",
+            "animation",
+            713,
+            200,
+            now + config.getHiscoreCooldownMillis(),
+            config
+        );
         assertTrue(service.markHiscoreLookupIfNeeded(name, config, now + config.getHiscoreCooldownMillis() + 1L));
+    }
+
+    @Test
+    public void staffOnlyDoesNotTriggerHiscoreLookup()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("Staff Only Lookup", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+
+        assertFalse(service.markHiscoreLookupIfNeeded(name, config, now));
+    }
+
+    @Test
+    public void singleObservationWithoutStaffDoesNotTriggerHiscoreLookup()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("One Cast No Staff", 301, 4, -1, now);
+        service.recordAlchObservation("One Cast No Staff", "animation", 713, 100, now, config);
+
+        assertFalse(service.markHiscoreLookupIfNeeded(name, config, now));
+    }
+
+    @Test
+    public void staffWithSingleObservationTriggersHiscoreLookup()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("Staff One Cast", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.recordAlchObservation("Staff One Cast", "animation", 713, 100, now, config);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(name, config, now));
+    }
+
+    @Test
+    public void repeatedBehaviorWithoutStaffTriggersHiscoreLookup()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("Repeated No Staff", 301, 4, -1, now);
+        recordFiveAlchs(service, "Repeated No Staff", now, config);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(name, config, now));
+    }
+
+    @Test
+    public void maxHiscoreLookupCapacityPreventsFourthConcurrentLookup()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String first = addLookupCandidate(service, "Lookup One", now, config);
+        String second = addLookupCandidate(service, "Lookup Two", now, config);
+        String third = addLookupCandidate(service, "Lookup Three", now, config);
+        String fourth = addLookupCandidate(service, "Lookup Four", now, config);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(first, config, now));
+        assertTrue(service.markHiscoreLookupIfNeeded(second, config, now));
+        assertTrue(service.markHiscoreLookupIfNeeded(third, config, now));
+        assertEquals(3, service.getHiscoreLookupsInFlight());
+        assertFalse(service.markHiscoreLookupIfNeeded(fourth, config, now));
+
+        service.applyHiscore(first, HiscoreProfile.found(55, 1, true));
+
+        assertEquals(2, service.getHiscoreLookupsInFlight());
+        assertTrue(service.markHiscoreLookupIfNeeded(fourth, config, now));
     }
 
     private void recordFiveAlchs(DetectorService service, String displayName, long now, DetectorConfigSnapshot config)
@@ -477,6 +565,13 @@ public class DetectorServiceTest
         {
             service.recordAlchObservation(displayName, "animation", 713, 100 + (i * 5), now + (i * 600L), config);
         }
+    }
+
+    private String addLookupCandidate(DetectorService service, String displayName, long now, DetectorConfigSnapshot config)
+    {
+        String name = service.updatePlayer(displayName, 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.recordAlchObservation(displayName, "animation", 713, 100, now, config);
+        return name;
     }
 
     private DetectorConfigSnapshot configWithClueCollectionReduction(int threshold, int penalty)
