@@ -61,7 +61,7 @@ The plugin never submits reports automatically.
 - Non-Magic total reduction: enabled
 - Non-Magic total reduction threshold: 150
 - Non-Magic total reduction penalty: -100
-- Clue/collection-log reduction threshold: more than 5 combined entries
+- Clue/collection-log reduction threshold: more than 4 combined entries
 - Clue/collection-log reduction penalty: -100
 
 Built-in score values:

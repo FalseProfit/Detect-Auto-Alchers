@@ -231,9 +231,9 @@ public class DetectorServiceTest
         DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
         long now = 10_000L;
 
-        String name = service.updatePlayer("Five Clues", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
-        recordFiveAlchs(service, "Five Clues", now, config);
-        service.applyHiscore(name, HiscoreProfile.found(89, 2, 40, 3, 2, true));
+        String name = service.updatePlayer("Four Clues", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Four Clues", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(89, 2, 40, 2, 2, true));
 
         service.recompute(config, now + 3_000L);
         List<SuspicionResult> suspects = service.getSuspiciousResults();
@@ -624,7 +624,7 @@ public class DetectorServiceTest
             true,
             125,
             100,
-            5,
+            4,
             100,
             15 * 60_000L,
             IdListParser.parse("713"),
@@ -654,7 +654,7 @@ public class DetectorServiceTest
             true,
             125,
             100,
-            5,
+            4,
             100,
             15 * 60_000L,
             IdListParser.parse("713"),
@@ -684,7 +684,7 @@ public class DetectorServiceTest
             true,
             125,
             100,
-            5,
+            4,
             100,
             15 * 60_000L,
             IdListParser.parse("713"),

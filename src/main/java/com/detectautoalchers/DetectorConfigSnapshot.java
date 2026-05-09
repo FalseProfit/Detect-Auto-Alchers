@@ -139,7 +139,7 @@ final class DetectorConfigSnapshot
             true,
             125,
             100,
-            5,
+            4,
             100,
             15 * 60_000L,
             IdListParser.parse("713"),

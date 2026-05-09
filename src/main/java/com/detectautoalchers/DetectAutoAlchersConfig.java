@@ -392,14 +392,14 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "clueCollectionActivityThreshold",
         name = "Clue/log threshold",
-        description = "Combined clue scroll completions and collection-log items above this value receive the clue/log score reduction. Default: 5.",
+        description = "Combined clue scroll completions and collection-log items above this value receive the clue/log score reduction. Default: 4.",
         position = 3,
         section = scoreReductionsSection
     )
     @Range(min = 0, max = 1000)
     default int clueCollectionActivityThreshold()
     {
-        return 5;
+        return 4;
     }
 
     @ConfigItem(
