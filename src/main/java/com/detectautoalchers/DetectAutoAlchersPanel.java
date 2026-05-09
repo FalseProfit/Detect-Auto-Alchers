@@ -23,6 +23,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
     private static final Color ROW_BACKGROUND = new Color(45, 45, 45);
     private static final Color HIGH_CONFIDENCE_ALERT = new Color(255, 83, 83);
     private static final Color MODERATE_CONFIDENCE_ALERT = new Color(255, 220, 64);
+    private static final Color SCORE_INCREASE = new Color(255, 120, 120);
+    private static final Color SCORE_DECREASE = new Color(120, 220, 140);
     private static final Color TEXT = new Color(230, 230, 230);
     private static final Color MUTED = new Color(170, 170, 170);
 
@@ -147,18 +149,16 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
         addSection(details, "Status");
         addDetail(details, "confidence: " + suspect.getConfidenceLabel());
-        addDetail(details, "world: " + suspect.getWorld());
-        addDetail(details, "distance: " + suspect.getDistance());
         addDetail(details, "seen: " + secondsSince(suspect.getLastSeenMillis(), nowMillis) + "s");
 
         addSection(details, "Score");
         addDetail(details, "score: " + suspect.getScore());
         for (String label : breakdown.getScoreLabels())
         {
-            addDetail(details, label);
+            addScoreDetail(details, label);
         }
-        addDetail(details, "positive total: " + breakdown.getPositiveTotal());
-        addDetail(details, "penalties: -" + breakdown.getPenaltyTotal());
+        addDetail(details, "positive total: " + breakdown.getPositiveTotal(), SCORE_INCREASE);
+        addDetail(details, "penalties: -" + breakdown.getPenaltyTotal(), SCORE_DECREASE);
 
         addSection(details, "Evidence");
         addDetail(details, "casts: " + suspect.getCastCount());
@@ -174,7 +174,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addDetail(details, "magic profile: " + yesNo(suspect.isMagicDominant()));
         addDetail(details, "high magic: " + yesNo(suspect.isHighMagic()));
         addDetail(details, "other skills: " + formatCount(suspect.getNonMagicSkillsAboveThreshold()));
-        addDetail(details, "non-magic total: " + formatCount(suspect.getNonMagicTotalLevel()));
+        addDetail(details, "non-magic total level: " + formatCount(suspect.getNonMagicTotalLevel()));
         addDetail(details, "clues + collection log: " + formatCount(suspect.getClueAndCollectionLogTotal()));
 
         addSection(details, "Reductions");
@@ -189,10 +189,35 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
     private void addDetail(JPanel panel, String text)
     {
+        addDetail(panel, text, MUTED);
+    }
+
+    private void addScoreDetail(JPanel panel, String text)
+    {
+        addDetail(panel, text, scoreLineColor(text));
+    }
+
+    private void addDetail(JPanel panel, String text, Color color)
+    {
         JLabel label = new JLabel(text);
-        label.setForeground(MUTED);
+        label.setForeground(color);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(label);
+    }
+
+    private Color scoreLineColor(String text)
+    {
+        if (text.contains(" -"))
+        {
+            return SCORE_DECREASE;
+        }
+
+        if (text.contains(" +"))
+        {
+            return SCORE_INCREASE;
+        }
+
+        return MUTED;
     }
 
     private void addSection(JPanel panel, String text)

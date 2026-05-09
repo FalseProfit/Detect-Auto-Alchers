@@ -285,7 +285,7 @@ public class DetectorServiceTest
         assertTrue(suspects.get(0).isMatureAccountSuppressed());
         assertEquals(120, suspects.get(0).getScore());
         assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("99 magic +100"));
-        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("non-magic total -100"));
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("non-magic total level -100"));
     }
 
     @Test

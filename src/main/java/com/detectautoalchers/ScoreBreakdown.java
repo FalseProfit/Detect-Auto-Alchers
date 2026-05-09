@@ -98,7 +98,7 @@ final class ScoreBreakdown
         addPositive(labels, "cadence", cadenceScore);
         addPositive(labels, "magic profile", hiscoreScore);
         addPositive(labels, "99 magic", highMagicScore);
-        addPenalty(labels, "non-magic total", matureAccountPenalty);
+        addPenalty(labels, "non-magic total level", matureAccountPenalty);
         addPenalty(labels, "clues/log", clueCollectionPenalty);
         return Collections.unmodifiableList(labels);
     }
