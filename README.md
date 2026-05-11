@@ -23,11 +23,15 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 
 - The scene overlay outlines high-confidence suspects in red and moderate-confidence suspects in yellow.
 - The plugin side panel lists current suspects, confidence, score, casts, hiscore evidence, reductions, and time since last seen.
+- The side panel can be switched to compact mode for shorter suspect rows.
 - Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
 - Right-click player menu entries are sorted by confidence when menu sorting is enabled: high confidence first, then moderate confidence, then unflagged entries.
 - When you click RuneLite's normal Report option, the plugin suppresses that player from future suspect highlighting. If reported-player persistence is enabled, the player is also saved locally across restarts.
 - Previously reported players can be outlined and menu-colored with a separate configurable reported-player color.
-- The side panel includes a Clear reported history button for local reported-player history.
+- The side panel can import, export, and clear local reported-player history.
+- The side panel includes a visual watchlist. Watched players can be outlined and shown in the panel when seen, but watchlist entries do not change detection score or confidence.
+- The side panel includes an Override list. Override-listed players are suppressed from suspect highlighting until removed from the list.
+- The side panel includes one-shot Conservative, Balanced, and Aggressive preset buttons. Presets write selected detection/scoring settings once; they do not create managed profiles.
 - Players on the RuneLite ignore list are suppressed.
 - Mobile-client players can be suppressed after their mobile icon is observed in the right-click menu.
 
@@ -52,6 +56,7 @@ The plugin never submits reports automatically.
 - Persistent reported-player history: enabled
 - Reported-player highlighting: enabled
 - Reported-player highlight color: RGB `144,238,144`
+- Compact panel mode: disabled
 - Hiscore scoring: enabled
 - Minimum Magic threshold: Magic level 53. Set to 21 to include Low Alchemy bots.
 - Other-skill threshold: level 50
@@ -61,7 +66,7 @@ The plugin never submits reports automatically.
 - Non-Magic total reduction: enabled
 - Non-Magic total reduction threshold: 150
 - Non-Magic total reduction penalty: -100
-- Clue/collection-log reduction threshold: more than 4 combined entries
+- Clue/collection-log reduction threshold: at least 4 combined entries
 - Clue/collection-log reduction penalty: -100
 
 Built-in score values:
@@ -77,9 +82,17 @@ Reported players are saved locally at:
 
 ```text
 ~/.runelite/detect-auto-alchers/reported-players.csv
+~/.runelite/detect-auto-alchers/watchlist.csv
+~/.runelite/detect-auto-alchers/override-list.csv
 ```
 
-The CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players are suppressed from future suspect highlighting and can optionally be outlined with a separate configurable reported-player color.
+Each CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players and Override list players are suppressed from future suspect highlighting. Watchlist players are visual only.
+
+Preset buttons apply these intent-level profiles:
+
+- Conservative: stricter cast and score thresholds, narrow staff matching, and stronger played-account reductions.
+- Balanced: current default detection/scoring settings.
+- Aggressive: lower cast and score thresholds, broad fire-rune staff matching, Magic threshold 21, and lighter played-account reductions.
 
 ## Development
 

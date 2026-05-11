@@ -2,6 +2,7 @@ package com.detectautoalchers;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -15,12 +16,12 @@ final class DetectorService
     private static final int MAX_HISCORE_LOOKUPS_IN_FLIGHT = 3;
     private static final long STALE_MULTIPLIER = 2L;
     private final Map<String, PlayerEvidence> evidenceByName = new LinkedHashMap<>();
-    private final Set<String> suppressedNames = new HashSet<>();
+    private final Map<String, EnumSet<SuppressionReason>> suppressionReasonsByName = new LinkedHashMap<>();
 
     synchronized void clear()
     {
         evidenceByName.clear();
-        suppressedNames.clear();
+        suppressionReasonsByName.clear();
     }
 
     synchronized void clearEvidence()
@@ -30,21 +31,35 @@ final class DetectorService
 
     synchronized void suppressName(String displayName)
     {
+        suppressName(displayName, SuppressionReason.REPORTED);
+    }
+
+    synchronized void suppressName(String displayName, SuppressionReason reason)
+    {
         String normalizedName = normalizeName(displayName);
         if (!normalizedName.isEmpty())
         {
-            suppressedNames.add(normalizedName);
+            suppressionReasonsByName
+                .computeIfAbsent(normalizedName, key -> EnumSet.noneOf(SuppressionReason.class))
+                .add(reason);
             evidenceByName.remove(normalizedName);
         }
     }
 
     synchronized void suppressNames(Set<String> normalizedNames)
     {
+        suppressNames(normalizedNames, SuppressionReason.REPORTED);
+    }
+
+    synchronized void suppressNames(Set<String> normalizedNames, SuppressionReason reason)
+    {
         for (String normalizedName : normalizedNames)
         {
             if (!normalizedName.isEmpty())
             {
-                suppressedNames.add(normalizedName);
+                suppressionReasonsByName
+                    .computeIfAbsent(normalizedName, key -> EnumSet.noneOf(SuppressionReason.class))
+                    .add(reason);
                 evidenceByName.remove(normalizedName);
             }
         }
@@ -52,12 +67,61 @@ final class DetectorService
 
     synchronized void unsuppressNames(Set<String> normalizedNames)
     {
-        suppressedNames.removeAll(normalizedNames);
+        unsuppressNames(normalizedNames, SuppressionReason.REPORTED);
+    }
+
+    synchronized void unsuppressNames(Set<String> normalizedNames, SuppressionReason reason)
+    {
+        for (String normalizedName : normalizedNames)
+        {
+            EnumSet<SuppressionReason> reasons = suppressionReasonsByName.get(normalizedName);
+            if (reasons == null)
+            {
+                continue;
+            }
+
+            reasons.remove(reason);
+            if (reasons.isEmpty())
+            {
+                suppressionReasonsByName.remove(normalizedName);
+            }
+        }
+    }
+
+    synchronized void syncSuppressionReason(Set<String> normalizedNames, SuppressionReason reason)
+    {
+        Set<String> normalized = new HashSet<>();
+        for (String normalizedName : normalizedNames)
+        {
+            String cleanName = normalizeName(normalizedName);
+            if (!cleanName.isEmpty())
+            {
+                normalized.add(cleanName);
+            }
+        }
+
+        List<String> previouslySuppressed = new ArrayList<>();
+        for (Map.Entry<String, EnumSet<SuppressionReason>> entry : suppressionReasonsByName.entrySet())
+        {
+            if (entry.getValue().contains(reason))
+            {
+                previouslySuppressed.add(entry.getKey());
+            }
+        }
+
+        for (String normalizedName : previouslySuppressed)
+        {
+            if (!normalized.contains(normalizedName))
+            {
+                unsuppressNames(Set.of(normalizedName), reason);
+            }
+        }
+        suppressNames(normalized, reason);
     }
 
     synchronized boolean isSuppressed(String displayName)
     {
-        return suppressedNames.contains(normalizeName(displayName));
+        return suppressionReasonsByName.containsKey(normalizeName(displayName));
     }
 
     synchronized String getDisplayName(String normalizedName)
@@ -78,7 +142,7 @@ final class DetectorService
         {
             return "";
         }
-        if (suppressedNames.contains(normalizedName))
+        if (suppressionReasonsByName.containsKey(normalizedName))
         {
             evidenceByName.remove(normalizedName);
             return normalizedName;
@@ -105,7 +169,7 @@ final class DetectorService
         {
             return false;
         }
-        if (suppressedNames.contains(normalizedName))
+        if (suppressionReasonsByName.containsKey(normalizedName))
         {
             evidenceByName.remove(normalizedName);
             return false;
@@ -154,7 +218,7 @@ final class DetectorService
         }
 
         PlayerEvidence evidence = evidenceByName.get(normalizedName);
-        if (evidence == null || suppressedNames.contains(normalizedName) || evidence.isHiscoreLookupInFlight())
+        if (evidence == null || suppressionReasonsByName.containsKey(normalizedName) || evidence.isHiscoreLookupInFlight())
         {
             return false;
         }
@@ -226,7 +290,7 @@ final class DetectorService
         for (PlayerEvidence evidence : evidenceByName.values())
         {
             SuspicionResult result = evidence.getLastResult();
-            if (result != null && result.isSuspicious() && !suppressedNames.contains(result.getNormalizedName()))
+            if (result != null && result.isSuspicious() && !suppressionReasonsByName.containsKey(result.getNormalizedName()))
             {
                 results.add(result);
             }
@@ -264,7 +328,7 @@ final class DetectorService
         for (PlayerEvidence evidence : evidenceByName.values())
         {
             SuspicionResult result = evidence.getLastResult();
-            if (result != null && !suppressedNames.contains(result.getNormalizedName()))
+            if (result != null && !suppressionReasonsByName.containsKey(result.getNormalizedName()))
             {
                 scoresByName.put(result.getNormalizedName(), result.getScore());
             }
@@ -272,11 +336,25 @@ final class DetectorService
         return scoresByName;
     }
 
+    synchronized Map<String, SuspicionResult> getResultsByName(Set<String> normalizedNames)
+    {
+        Map<String, SuspicionResult> resultsByName = new LinkedHashMap<>();
+        for (String normalizedName : normalizedNames)
+        {
+            PlayerEvidence evidence = evidenceByName.get(normalizeName(normalizedName));
+            if (evidence != null && evidence.getLastResult() != null)
+            {
+                resultsByName.put(evidence.getNormalizedName(), evidence.getLastResult());
+            }
+        }
+        return resultsByName;
+    }
+
     synchronized boolean isSuspicious(String displayName)
     {
         PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));
         return evidence != null
-            && !suppressedNames.contains(evidence.getNormalizedName())
+            && !suppressionReasonsByName.containsKey(evidence.getNormalizedName())
             && evidence.getLastResult() != null
             && evidence.getLastResult().isSuspicious();
     }
@@ -285,7 +363,7 @@ final class DetectorService
     {
         PlayerEvidence evidence = evidenceByName.get(normalizeName(displayName));
         if (evidence == null
-            || suppressedNames.contains(evidence.getNormalizedName())
+            || suppressionReasonsByName.containsKey(evidence.getNormalizedName())
             || evidence.getLastResult() == null)
         {
             return DetectionConfidence.NONE;
@@ -332,6 +410,7 @@ final class DetectorService
             && !belowMagicThreshold
             && hiscoreProfile.isAtLeastMagicLevel(config.getMagicLevelThreshold())
             && hiscoreProfile.hasAtMostNonMagicSkillsAboveThreshold(
+                config.getNonMagicSkillThreshold(),
                 config.getAllowedNonMagicSkillsAboveThreshold()
             );
         boolean highMagic = config.isEnableHiscoreScoring()
@@ -421,7 +500,7 @@ final class DetectorService
             highMagic,
             consistentCadence,
             hiscoreProfile.getMagicLevel(),
-            hiscoreProfile.getNonMagicSkillsAboveThreshold(),
+            hiscoreProfile.getNonMagicSkillsAboveThreshold(config.getNonMagicSkillThreshold()),
             hiscoreProfile.getNonMagicTotalLevel(),
             matureAccountSuppressed,
             hiscoreProfile.getClueScrollCompletions(),

@@ -264,6 +264,18 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "compactPanelMode",
+        name = "Compact panel mode",
+        description = "Show shorter suspect rows in the side panel. Default: off.",
+        position = 17,
+        section = basicSection
+    )
+    default boolean compactPanelMode()
+    {
+        return false;
+    }
+
+    @ConfigItem(
         keyName = "showMenuDetectionScores",
         name = "Show menu detection scores",
         description = "Show each right-clicked player's current detection score for debugging. Unknown, untracked, and suppressed players display 0. Default: off.",
@@ -392,11 +404,11 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "clueCollectionActivityThreshold",
         name = "Clue/log threshold",
-        description = "Combined clue scroll completions and collection-log items above this value receive the clue/log score reduction. Default: 4.",
+        description = "Combined clue scroll completions and collection-log items at or above this value receive the clue/log score reduction. Default: 4.",
         position = 3,
         section = scoreReductionsSection
     )
-    @Range(min = 0, max = 1000)
+    @Range(min = 1, max = 1000)
     default int clueCollectionActivityThreshold()
     {
         return 4;
@@ -405,7 +417,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "clueCollectionActivityScorePenalty",
         name = "Clue/log penalty",
-        description = "Detection score subtracted when combined clue scroll completions and collection-log items exceed the clue/log threshold. Default: -100.",
+        description = "Detection score subtracted when combined clue scroll completions and collection-log items meet the clue/log threshold. Default: -100.",
         position = 4,
         section = scoreReductionsSection
     )

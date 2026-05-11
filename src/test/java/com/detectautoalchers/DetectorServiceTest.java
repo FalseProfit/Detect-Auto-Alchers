@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 
 public class DetectorServiceTest
@@ -225,10 +226,10 @@ public class DetectorServiceTest
     }
 
     @Test
-    public void clueCollectionAtThresholdDoesNotPenalize()
+    public void clueCollectionAtThresholdPenalizes()
     {
         DetectorService service = new DetectorService();
-        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        DetectorConfigSnapshot config = configWithClueCollectionReduction(4, 40);
         long now = 10_000L;
 
         String name = service.updatePlayer("Four Clues", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
@@ -239,8 +240,8 @@ public class DetectorServiceTest
         List<SuspicionResult> suspects = service.getSuspiciousResults();
 
         assertEquals(1, suspects.size());
-        assertFalse(suspects.get(0).isClueCollectionActivitySuppressed());
-        assertEquals(120, suspects.get(0).getScore());
+        assertTrue(suspects.get(0).isClueCollectionActivitySuppressed());
+        assertEquals(80, suspects.get(0).getScore());
     }
 
     @Test
@@ -400,6 +401,62 @@ public class DetectorServiceTest
         assertTrue(service.getSuspiciousResults().isEmpty());
         assertFalse(service.isSuspicious("Reported Alcher"));
         assertFalse(service.recordAlchObservation("Reported Alcher", "animation", 713, 200, now + 4_000L, config));
+    }
+
+    @Test
+    public void suppressionReasonsDoNotClearEachOther()
+    {
+        DetectorService service = new DetectorService();
+
+        service.suppressName("Layered Alcher", SuppressionReason.MOBILE);
+        service.suppressName("Layered Alcher", SuppressionReason.REPORTED);
+
+        service.unsuppressNames(Set.of("layered alcher"), SuppressionReason.MOBILE);
+        assertTrue(service.isSuppressed("Layered Alcher"));
+
+        service.unsuppressNames(Set.of("layered alcher"), SuppressionReason.REPORTED);
+        assertFalse(service.isSuppressed("Layered Alcher"));
+    }
+
+    @Test
+    public void syncSuppressionReasonRemovesStaleReasonOnly()
+    {
+        DetectorService service = new DetectorService();
+
+        service.suppressName("Ignored Alcher", SuppressionReason.RUNELITE_IGNORE);
+        service.suppressName("Reported Alcher", SuppressionReason.REPORTED);
+        service.syncSuppressionReason(Set.of("fresh ignored"), SuppressionReason.RUNELITE_IGNORE);
+
+        assertFalse(service.isSuppressed("Ignored Alcher"));
+        assertTrue(service.isSuppressed("Reported Alcher"));
+        assertTrue(service.isSuppressed("Fresh Ignored"));
+    }
+
+    @Test
+    public void hiscoreProfileRecomputesNonMagicThresholdFromStoredLevels()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot strictConfig = configWithNonMagicThreshold(50);
+        DetectorConfigSnapshot relaxedConfig = configWithNonMagicThreshold(70);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Threshold Alcher", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Threshold Alcher", now, strictConfig);
+        service.applyHiscore(
+            name,
+            HiscoreProfile.found(89, 3, 180, 0, 0, false, new int[]{60, 60, 60})
+        );
+
+        service.recompute(strictConfig, now + 3_000L);
+        assertEquals(90, service.getScoresByName().get("threshold alcher").intValue());
+
+        service.recompute(relaxedConfig, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertTrue(suspects.get(0).isMagicDominant());
+        assertEquals(0, suspects.get(0).getNonMagicSkillsAboveThreshold());
+        assertEquals(120, suspects.get(0).getScore());
     }
 
     @Test
@@ -682,6 +739,36 @@ public class DetectorServiceTest
             true,
             100,
             true,
+            125,
+            100,
+            4,
+            100,
+            15 * 60_000L,
+            IdListParser.parse("713"),
+            IdListParser.parse("112,113"),
+            true,
+            true
+        );
+    }
+
+    private DetectorConfigSnapshot configWithNonMagicThreshold(int nonMagicThreshold)
+    {
+        return new DetectorConfigSnapshot(
+            15,
+            60_000L,
+            5,
+            80,
+            110,
+            true,
+            false,
+            true,
+            true,
+            53,
+            nonMagicThreshold,
+            2,
+            true,
+            100,
+            false,
             125,
             100,
             4,

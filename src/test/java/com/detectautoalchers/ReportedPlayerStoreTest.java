@@ -80,4 +80,70 @@ public class ReportedPlayerStoreTest
         assertFalse(store.contains("clear bot"));
         assertEquals("normalized_name,display_name,date_reported", Files.readString(path, StandardCharsets.UTF_8).trim());
     }
+
+    @Test
+    public void importsReportedPlayersByMerging() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path importPath = temporaryFolder.newFolder().toPath().resolve("import.csv");
+        Files.write(importPath, List.of(
+            "normalized_name,display_name,date_reported",
+            "import bot,Import Bot,2026-04-27T14:35:22Z"
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("local bot", "Local Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.importFrom(importPath, ImportMode.MERGE);
+
+        assertTrue(store.contains("Local Bot"));
+        assertTrue(store.contains("Import Bot"));
+        assertEquals(2, store.getNormalizedNames().size());
+    }
+
+    @Test
+    public void importsReportedPlayersByReplacing() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path importPath = temporaryFolder.newFolder().toPath().resolve("import.csv");
+        Files.write(importPath, List.of(
+            "normalized_name,display_name,date_reported",
+            "import bot,Import Bot,2026-04-27T14:35:22Z"
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("local bot", "Local Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.importFrom(importPath, ImportMode.REPLACE);
+
+        assertFalse(store.contains("Local Bot"));
+        assertTrue(store.contains("Import Bot"));
+        assertEquals(1, store.getNormalizedNames().size());
+    }
+
+    @Test
+    public void exportsReportedPlayers() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path exportPath = temporaryFolder.newFolder().toPath().resolve("export.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("export bot", "Export Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.exportTo(exportPath);
+
+        String csv = Files.readString(exportPath, StandardCharsets.UTF_8);
+        assertTrue(csv.contains("export bot,Export Bot,2026-04-26T14:35:22Z"));
+    }
+
+    @Test
+    public void removesSingleEntry() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("keep bot", "Keep Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("remove bot", "Remove Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.remove("Remove Bot");
+
+        assertTrue(store.contains("Keep Bot"));
+        assertFalse(store.contains("Remove Bot"));
+    }
 }

@@ -1,18 +1,25 @@
 package com.detectautoalchers;
 
 import com.google.inject.Provides;
+import com.google.inject.name.Named;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -75,13 +82,25 @@ public class DetectAutoAlchersPlugin extends Plugin
     private HiscoreClient hiscoreClient;
 
     @Inject
+    private ConfigManager configManager;
+
+    @Inject
     private DetectorService detectorService;
 
     @Inject
     private ReportedPlayerStore reportedPlayerStore;
 
+    @Inject
+    @Named("watchlist")
+    private ReportedPlayerStore watchlistStore;
+
+    @Inject
+    @Named("overrideList")
+    private ReportedPlayerStore overrideListStore;
+
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
+    private ExecutorService ioExecutor;
     private final Set<String> mobilePlayerNames = new HashSet<>();
     private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
 
@@ -105,15 +124,35 @@ public class DetectAutoAlchersPlugin extends Plugin
         return ReportedPlayerStore.createDefault();
     }
 
+    @Provides
+    @Singleton
+    @Named("watchlist")
+    ReportedPlayerStore provideWatchlistStore()
+    {
+        return ReportedPlayerStore.createWatchlist();
+    }
+
+    @Provides
+    @Singleton
+    @Named("overrideList")
+    ReportedPlayerStore provideOverrideListStore()
+    {
+        return ReportedPlayerStore.createOverrideList();
+    }
+
     @Override
     protected void startUp()
     {
+        ioExecutor = Executors.newSingleThreadExecutor(runnable ->
+        {
+            Thread thread = new Thread(runnable, "detect-auto-alchers-io");
+            thread.setDaemon(true);
+            return thread;
+        });
         mobilePlayerNames.clear();
         detectorService.clear();
-        loadReportedPlayers();
-        overlayManager.add(overlay);
 
-        panel = new DetectAutoAlchersPanel(this::clearReportedHistory);
+        panel = new DetectAutoAlchersPanel(new PanelActions());
         navButton = NavigationButton.builder()
             .tooltip("Detect Auto Alchers")
             .icon(createIcon())
@@ -121,6 +160,8 @@ public class DetectAutoAlchersPlugin extends Plugin
             .panel(panel)
             .build();
         clientToolbar.addNavigation(navButton);
+        overlayManager.add(overlay);
+        loadPlayerLists();
     }
 
     @Override
@@ -137,6 +178,19 @@ public class DetectAutoAlchersPlugin extends Plugin
         panelRefreshGate.reset();
         mobilePlayerNames.clear();
         detectorService.clear();
+        if (ioExecutor != null)
+        {
+            ioExecutor.shutdownNow();
+            try
+            {
+                ioExecutor.awaitTermination(2, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException ex)
+            {
+                Thread.currentThread().interrupt();
+            }
+            ioExecutor = null;
+        }
     }
 
     @Subscribe
@@ -151,11 +205,22 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             if (config.ignoreMobilePlayers())
             {
-                detectorService.suppressNames(mobilePlayerNames);
+                detectorService.suppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
             }
             else
             {
-                detectorService.unsuppressNames(getMobileOnlyNames());
+                detectorService.unsuppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
+            }
+        }
+        else if ("persistReportedPlayers".equals(event.getKey()))
+        {
+            if (config.persistReportedPlayers())
+            {
+                detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
+            }
+            else
+            {
+                detectorService.unsuppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
             }
         }
 
@@ -186,12 +251,12 @@ public class DetectAutoAlchersPlugin extends Plugin
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
         if (isObservedMobilePlayer(actor.getName(), snapshot))
         {
-            detectorService.suppressName(actor.getName());
+            detectorService.suppressName(actor.getName(), SuppressionReason.MOBILE);
             return;
         }
         if (isIgnoredPlayer(actor.getName()))
         {
-            detectorService.suppressName(actor.getName());
+            detectorService.suppressName(actor.getName(), SuppressionReason.RUNELITE_IGNORE);
             return;
         }
 
@@ -242,12 +307,12 @@ public class DetectAutoAlchersPlugin extends Plugin
 
             if (isIgnoredPlayer(player.getName()))
             {
-                detectorService.suppressName(player.getName());
+                detectorService.suppressName(player.getName(), SuppressionReason.RUNELITE_IGNORE);
                 continue;
             }
             if (isObservedMobilePlayer(player.getName(), snapshot))
             {
-                detectorService.suppressName(player.getName());
+                detectorService.suppressName(player.getName(), SuppressionReason.MOBILE);
                 continue;
             }
 
@@ -264,10 +329,10 @@ public class DetectAutoAlchersPlugin extends Plugin
             requestHiscoreIfNeeded(player.getName(), normalizedName, snapshot, nowMillis);
         }
 
-        detectorService.suppressNames(getIgnoredNames());
+        detectorService.syncSuppressionReason(getIgnoredNames(), SuppressionReason.RUNELITE_IGNORE);
         if (snapshot.isIgnoreMobilePlayers())
         {
-            detectorService.suppressNames(mobilePlayerNames);
+            detectorService.suppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
         }
         detectorService.pruneStale(nowMillis, snapshot.getObservationWindowMillis());
         detectorService.recompute(snapshot, nowMillis);
@@ -330,7 +395,14 @@ public class DetectAutoAlchersPlugin extends Plugin
 
         if (config.ignoreMobilePlayers() && MenuHighlighter.hasMobileClientIcon(event.getMenuTarget()))
         {
-            suppressMobilePlayer(getReportedPlayerName(event));
+            String displayName = getReportedPlayerName(event);
+            suppressMobilePlayer(displayName);
+            String normalizedName = DetectorService.normalizeName(displayName);
+            if (!normalizedName.isEmpty())
+            {
+                detectorService.suppressName(normalizedName, SuppressionReason.REPORTED);
+                recordReportedPlayer(normalizedName, displayName);
+            }
             refreshPanel(System.currentTimeMillis(), true);
             return;
         }
@@ -340,7 +412,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         if (!normalizedName.isEmpty())
         {
             recordReportedPlayer(normalizedName, displayName);
-            detectorService.suppressName(normalizedName);
+            detectorService.suppressName(normalizedName, SuppressionReason.REPORTED);
             refreshPanel(System.currentTimeMillis(), true);
         }
     }
@@ -404,21 +476,13 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         boolean added = mobilePlayerNames.add(normalizedName);
-        detectorService.suppressName(normalizedName);
+        detectorService.suppressName(normalizedName, SuppressionReason.MOBILE);
         return added;
     }
 
     private boolean isObservedMobilePlayer(String displayName, DetectorConfigSnapshot snapshot)
     {
         return snapshot.isIgnoreMobilePlayers() && mobilePlayerNames.contains(DetectorService.normalizeName(displayName));
-    }
-
-    private Set<String> getMobileOnlyNames()
-    {
-        Set<String> mobileOnlyNames = new HashSet<>(mobilePlayerNames);
-        mobileOnlyNames.removeAll(reportedPlayerStore.getNormalizedNames());
-        mobileOnlyNames.removeAll(getIgnoredNames());
-        return mobileOnlyNames;
     }
 
     private boolean isInRadius(Player player, int radius)
@@ -464,22 +528,27 @@ public class DetectAutoAlchersPlugin extends Plugin
         return ignoredNames;
     }
 
-    private void loadReportedPlayers()
+    private void loadPlayerLists()
     {
-        if (!config.persistReportedPlayers())
+        runIo(() ->
         {
-            return;
-        }
-
-        try
-        {
-            reportedPlayerStore.load();
-            detectorService.suppressNames(reportedPlayerStore.getNormalizedNames());
-        }
-        catch (IOException ex)
-        {
-            log.warn("Unable to load reported player history from {}", reportedPlayerStore.getPath(), ex);
-        }
+            try
+            {
+                reportedPlayerStore.load();
+                watchlistStore.load();
+                overrideListStore.load();
+                if (config.persistReportedPlayers())
+                {
+                    detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
+                }
+                detectorService.suppressNames(overrideListStore.getNormalizedNames(), SuppressionReason.OVERRIDE);
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to load Detect Auto Alchers player lists", ex);
+            }
+        });
     }
 
     private void recordReportedPlayer(String normalizedName, String displayName)
@@ -489,33 +558,37 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        try
+        runIo(() ->
         {
-            reportedPlayerStore.record(normalizedName, displayName, Instant.now());
-        }
-        catch (IOException ex)
-        {
-            log.warn("Unable to save reported player history to {}", reportedPlayerStore.getPath(), ex);
-        }
+            try
+            {
+                reportedPlayerStore.record(normalizedName, displayName, Instant.now());
+                detectorService.suppressName(normalizedName, SuppressionReason.REPORTED);
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to save reported player history to {}", reportedPlayerStore.getPath(), ex);
+            }
+        });
     }
 
     private void clearReportedHistory()
     {
-        Set<String> reportedNames = reportedPlayerStore.getNormalizedNames();
-        try
+        runIo(() ->
         {
-            reportedPlayerStore.clear();
-            detectorService.unsuppressNames(reportedNames);
-            if (config.ignoreMobilePlayers())
+            try
             {
-                detectorService.suppressNames(mobilePlayerNames);
+                Set<String> reportedNames = reportedPlayerStore.getNormalizedNames();
+                reportedPlayerStore.clear();
+                detectorService.unsuppressNames(reportedNames, SuppressionReason.REPORTED);
+                refreshPanel(System.currentTimeMillis(), true);
             }
-            refreshPanel(System.currentTimeMillis(), true);
-        }
-        catch (IOException ex)
-        {
-            log.warn("Unable to clear reported player history at {}", reportedPlayerStore.getPath(), ex);
-        }
+            catch (IOException ex)
+            {
+                log.warn("Unable to clear reported player history at {}", reportedPlayerStore.getPath(), ex);
+            }
+        });
     }
 
     private void scanSpotAnimations(Player player, DetectorConfigSnapshot snapshot, long nowMillis)
@@ -587,7 +660,235 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        panel.refresh(suspects, nowMillis);
+        panel.refresh(
+            suspects,
+            nowMillis,
+            watchlistStore.getReportedPlayers(),
+            overrideListStore.getReportedPlayers(),
+            detectorService.getResultsByName(watchlistStore.getNormalizedNames()),
+            config.compactPanelMode()
+        );
+    }
+
+    private void recordListEntry(
+        ReportedPlayerStore store,
+        String normalizedName,
+        String displayName,
+        SuppressionReason suppressionReason)
+    {
+        runIo(() ->
+        {
+            try
+            {
+                store.record(normalizedName, displayName, Instant.now());
+                if (suppressionReason != null)
+                {
+                    detectorService.suppressName(normalizedName, suppressionReason);
+                }
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to save player list at {}", store.getPath(), ex);
+            }
+        });
+    }
+
+    private void removeListEntry(ReportedPlayerStore store, String normalizedName, SuppressionReason suppressionReason)
+    {
+        runIo(() ->
+        {
+            try
+            {
+                store.remove(normalizedName);
+                if (suppressionReason != null)
+                {
+                    detectorService.unsuppressNames(Set.of(normalizedName), suppressionReason);
+                }
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to update player list at {}", store.getPath(), ex);
+            }
+        });
+    }
+
+    private void importReportedHistory()
+    {
+        Path path = chooseFile("Import reported history", JFileChooser.OPEN_DIALOG);
+        if (path == null)
+        {
+            return;
+        }
+
+        int choice = JOptionPane.showOptionDialog(
+            panel,
+            "Import reported history by merging with existing entries or replacing them?",
+            "Import reported history",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            new Object[]{"Merge", "Replace", "Cancel"},
+            "Merge"
+        );
+        if (choice == 2 || choice == JOptionPane.CLOSED_OPTION)
+        {
+            return;
+        }
+
+        ImportMode mode = choice == 1 ? ImportMode.REPLACE : ImportMode.MERGE;
+        runIo(() ->
+        {
+            try
+            {
+                Set<String> oldNames = reportedPlayerStore.getNormalizedNames();
+                reportedPlayerStore.importFrom(path, mode);
+                if (mode == ImportMode.REPLACE)
+                {
+                    detectorService.unsuppressNames(oldNames, SuppressionReason.REPORTED);
+                }
+                if (config.persistReportedPlayers())
+                {
+                    detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
+                }
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to import reported player history from {}", path, ex);
+            }
+        });
+    }
+
+    private void exportReportedHistory()
+    {
+        Path path = chooseFile("Export reported history", JFileChooser.SAVE_DIALOG);
+        if (path == null)
+        {
+            return;
+        }
+
+        runIo(() ->
+        {
+            try
+            {
+                reportedPlayerStore.exportTo(path);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to export reported player history to {}", path, ex);
+            }
+        });
+    }
+
+    private Path chooseFile(String title, int dialogType)
+    {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle(title);
+        int result = dialogType == JFileChooser.SAVE_DIALOG
+            ? chooser.showSaveDialog(panel)
+            : chooser.showOpenDialog(panel);
+        if (result != JFileChooser.APPROVE_OPTION || chooser.getSelectedFile() == null)
+        {
+            return null;
+        }
+        return chooser.getSelectedFile().toPath();
+    }
+
+    private void applyPreset(DetectionPreset preset)
+    {
+        configManager.setConfiguration(CONFIG_GROUP, "castThreshold", preset.getCastThreshold());
+        configManager.setConfiguration(CONFIG_GROUP, "suspicionThreshold", preset.getSuspicionThreshold());
+        configManager.setConfiguration(CONFIG_GROUP, "highConfidenceMargin", preset.getHighConfidenceMargin());
+        configManager.setConfiguration(CONFIG_GROUP, "requireFireStaff", preset.isRequireFireStaff());
+        configManager.setConfiguration(CONFIG_GROUP, "includeFireRuneStaves", preset.isIncludeFireRuneStaves());
+        configManager.setConfiguration(CONFIG_GROUP, "magicLevelThreshold", preset.getMagicLevelThreshold());
+        configManager.setConfiguration(CONFIG_GROUP, "nonMagicSkillThreshold", preset.getNonMagicSkillThreshold());
+        configManager.setConfiguration(
+            CONFIG_GROUP,
+            "allowedNonMagicSkillsAboveThreshold",
+            preset.getAllowedNonMagicSkillsAboveThreshold()
+        );
+        configManager.setConfiguration(
+            CONFIG_GROUP,
+            "nonMagicTotalLevelSuppressionThreshold",
+            preset.getNonMagicTotalLevelSuppressionThreshold()
+        );
+        configManager.setConfiguration(CONFIG_GROUP, "matureAccountScorePenalty", preset.getMatureAccountScorePenalty());
+        configManager.setConfiguration(
+            CONFIG_GROUP,
+            "clueCollectionActivityThreshold",
+            preset.getClueCollectionActivityThreshold()
+        );
+        configManager.setConfiguration(
+            CONFIG_GROUP,
+            "clueCollectionActivityScorePenalty",
+            preset.getClueCollectionActivityScorePenalty()
+        );
+        refreshPanel(System.currentTimeMillis(), true);
+    }
+
+    private void runIo(Runnable runnable)
+    {
+        ExecutorService executor = ioExecutor;
+        if (executor == null || executor.isShutdown())
+        {
+            runnable.run();
+            return;
+        }
+        executor.execute(runnable);
+    }
+
+    private final class PanelActions implements DetectAutoAlchersPanel.Actions
+    {
+        @Override
+        public void clearReportedHistory()
+        {
+            DetectAutoAlchersPlugin.this.clearReportedHistory();
+        }
+
+        @Override
+        public void importReportedHistory()
+        {
+            DetectAutoAlchersPlugin.this.importReportedHistory();
+        }
+
+        @Override
+        public void exportReportedHistory()
+        {
+            DetectAutoAlchersPlugin.this.exportReportedHistory();
+        }
+
+        @Override
+        public void watch(String normalizedName, String displayName)
+        {
+            recordListEntry(watchlistStore, normalizedName, displayName, null);
+        }
+
+        @Override
+        public void override(String normalizedName, String displayName)
+        {
+            recordListEntry(overrideListStore, normalizedName, displayName, SuppressionReason.OVERRIDE);
+        }
+
+        @Override
+        public void removeWatch(String normalizedName)
+        {
+            removeListEntry(watchlistStore, normalizedName, null);
+        }
+
+        @Override
+        public void removeOverride(String normalizedName)
+        {
+            removeListEntry(overrideListStore, normalizedName, SuppressionReason.OVERRIDE);
+        }
+
+        @Override
+        public void applyPreset(DetectionPreset preset)
+        {
+            DetectAutoAlchersPlugin.this.applyPreset(preset);
+        }
     }
 
     private BufferedImage createIcon()

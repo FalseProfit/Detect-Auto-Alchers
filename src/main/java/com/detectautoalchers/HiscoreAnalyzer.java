@@ -1,5 +1,7 @@
 package com.detectautoalchers;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import net.runelite.client.hiscore.HiscoreResult;
 import net.runelite.client.hiscore.HiscoreSkill;
@@ -27,6 +29,7 @@ final class HiscoreAnalyzer
         int magicLevel = level(magic);
         int nonMagicHighSkills = 0;
         int nonMagicTotalLevel = 0;
+        List<Integer> nonMagicLevels = new ArrayList<>();
 
         for (Map.Entry<HiscoreSkill, Skill> entry : result.getSkills().entrySet())
         {
@@ -37,6 +40,7 @@ final class HiscoreAnalyzer
             }
 
             int level = level(entry.getValue());
+            nonMagicLevels.add(level);
             nonMagicTotalLevel += level;
             if (level > nonMagicSkillThreshold)
             {
@@ -52,8 +56,19 @@ final class HiscoreAnalyzer
             nonMagicTotalLevel,
             activityCount(result.getSkill(HiscoreSkill.CLUE_SCROLL_ALL)),
             activityCount(result.getSkill(HiscoreSkill.COLLECTIONS_LOGGED)),
-            magicDominant
+            magicDominant,
+            toArray(nonMagicLevels)
         );
+    }
+
+    private static int[] toArray(List<Integer> levels)
+    {
+        int[] values = new int[levels.size()];
+        for (int i = 0; i < levels.size(); i++)
+        {
+            values[i] = levels.get(i);
+        }
+        return values;
     }
 
     private static int level(Skill skill)

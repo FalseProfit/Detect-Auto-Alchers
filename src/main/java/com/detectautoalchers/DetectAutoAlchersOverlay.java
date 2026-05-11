@@ -1,5 +1,6 @@
 package com.detectautoalchers;
 
+import com.google.inject.name.Named;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -20,10 +21,12 @@ final class DetectAutoAlchersOverlay extends Overlay
 {
     private static final Color HIGH_CONFIDENCE_OUTLINE_COLOR = new Color(255, 48, 48);
     private static final Color MODERATE_CONFIDENCE_OUTLINE_COLOR = new Color(255, 220, 64);
+    private static final Color WATCHLIST_OUTLINE_COLOR = new Color(120, 190, 255);
 
     private final Client client;
     private final DetectorService detectorService;
     private final ReportedPlayerStore reportedPlayerStore;
+    private final ReportedPlayerStore watchlistStore;
     private final DetectAutoAlchersConfig config;
     private final ModelOutlineRenderer modelOutlineRenderer;
 
@@ -32,12 +35,14 @@ final class DetectAutoAlchersOverlay extends Overlay
         Client client,
         DetectorService detectorService,
         ReportedPlayerStore reportedPlayerStore,
+        @Named("watchlist") ReportedPlayerStore watchlistStore,
         DetectAutoAlchersConfig config,
         ModelOutlineRenderer modelOutlineRenderer)
     {
         this.client = client;
         this.detectorService = detectorService;
         this.reportedPlayerStore = reportedPlayerStore;
+        this.watchlistStore = watchlistStore;
         this.config = config;
         this.modelOutlineRenderer = modelOutlineRenderer;
         setPosition(OverlayPosition.DYNAMIC);
@@ -68,6 +73,10 @@ final class DetectAutoAlchersOverlay extends Overlay
             if (config.highlightReportedPlayers() && reportedPlayerStore.contains(player.getName()))
             {
                 drawPlayer(graphics, player, config.reportedPlayerHighlightColor());
+            }
+            else if (watchlistStore.contains(player.getName()))
+            {
+                drawPlayer(graphics, player, WATCHLIST_OUTLINE_COLOR);
             }
             else
             {

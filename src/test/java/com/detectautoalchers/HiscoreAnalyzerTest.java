@@ -88,7 +88,7 @@ public class HiscoreAnalyzerTest
     }
 
     @Test
-    public void clueAndCollectionLogThresholdRequiresMoreThanConfiguredValue()
+    public void clueAndCollectionLogThresholdMatchesConfiguredValue()
     {
         HiscoreProfile profile = HiscoreAnalyzer.analyze(
             resultWithActivities(55, 3, 2),
@@ -98,7 +98,7 @@ public class HiscoreAnalyzerTest
         );
 
         assertEquals(5, profile.getClueAndCollectionLogTotal());
-        assertFalse(profile.hasClueOrCollectionLogActivity(5));
+        assertTrue(profile.hasClueOrCollectionLogActivity(5));
     }
 
     @Test
@@ -110,6 +110,22 @@ public class HiscoreAnalyzerTest
         assertEquals(0, profile.getCollectionLogItems());
         assertEquals(0, profile.getClueAndCollectionLogTotal());
         assertFalse(profile.hasClueOrCollectionLogActivity(5));
+        assertFalse(profile.hasClueOrCollectionLogActivity(0));
+    }
+
+    @Test
+    public void oneActivityMatchesMinimumThreshold()
+    {
+        HiscoreProfile profile = HiscoreAnalyzer.analyze(
+            resultWithActivities(55, 1, 0),
+            21,
+            10,
+            2
+        );
+
+        assertEquals(1, profile.getClueAndCollectionLogTotal());
+        assertTrue(profile.hasClueOrCollectionLogActivity(1));
+        assertTrue(profile.hasClueOrCollectionLogActivity(0));
     }
 
     @Test

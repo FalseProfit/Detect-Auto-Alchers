@@ -2,6 +2,8 @@ package com.detectautoalchers;
 
 final class HiscoreProfile
 {
+    private static final int[] EMPTY_LEVELS = new int[0];
+
     enum Status
     {
         UNKNOWN,
@@ -11,10 +13,10 @@ final class HiscoreProfile
         ERROR
     }
 
-    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, -1, -1, -1, false);
-    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, -1, -1, -1, false);
-    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, -1, -1, -1, false);
-    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, -1, -1, -1, false);
+    private static final HiscoreProfile UNKNOWN = new HiscoreProfile(Status.UNKNOWN, -1, -1, -1, -1, -1, false, EMPTY_LEVELS);
+    private static final HiscoreProfile PENDING = new HiscoreProfile(Status.PENDING, -1, -1, -1, -1, -1, false, EMPTY_LEVELS);
+    private static final HiscoreProfile NOT_FOUND = new HiscoreProfile(Status.NOT_FOUND, -1, -1, -1, -1, -1, false, EMPTY_LEVELS);
+    private static final HiscoreProfile ERROR = new HiscoreProfile(Status.ERROR, -1, -1, -1, -1, -1, false, EMPTY_LEVELS);
 
     private final Status status;
     private final int magicLevel;
@@ -23,6 +25,7 @@ final class HiscoreProfile
     private final int clueScrollCompletions;
     private final int collectionLogItems;
     private final boolean magicDominant;
+    private final int[] nonMagicLevels;
 
     private HiscoreProfile(
         Status status,
@@ -31,7 +34,8 @@ final class HiscoreProfile
         int nonMagicTotalLevel,
         int clueScrollCompletions,
         int collectionLogItems,
-        boolean magicDominant)
+        boolean magicDominant,
+        int[] nonMagicLevels)
     {
         this.status = status;
         this.magicLevel = magicLevel;
@@ -40,6 +44,7 @@ final class HiscoreProfile
         this.clueScrollCompletions = clueScrollCompletions;
         this.collectionLogItems = collectionLogItems;
         this.magicDominant = magicDominant;
+        this.nonMagicLevels = nonMagicLevels == null ? EMPTY_LEVELS : nonMagicLevels.clone();
     }
 
     static HiscoreProfile unknown()
@@ -84,6 +89,26 @@ final class HiscoreProfile
         int collectionLogItems,
         boolean magicDominant)
     {
+        return found(
+            magicLevel,
+            nonMagicSkillsAboveThreshold,
+            nonMagicTotalLevel,
+            clueScrollCompletions,
+            collectionLogItems,
+            magicDominant,
+            null
+        );
+    }
+
+    static HiscoreProfile found(
+        int magicLevel,
+        int nonMagicSkillsAboveThreshold,
+        int nonMagicTotalLevel,
+        int clueScrollCompletions,
+        int collectionLogItems,
+        boolean magicDominant,
+        int[] nonMagicLevels)
+    {
         return new HiscoreProfile(
             Status.FOUND,
             magicLevel,
@@ -91,7 +116,8 @@ final class HiscoreProfile
             nonMagicTotalLevel,
             clueScrollCompletions,
             collectionLogItems,
-            magicDominant
+            magicDominant,
+            nonMagicLevels
         );
     }
 
@@ -108,6 +134,28 @@ final class HiscoreProfile
     int getNonMagicSkillsAboveThreshold()
     {
         return nonMagicSkillsAboveThreshold;
+    }
+
+    int getNonMagicSkillsAboveThreshold(int threshold)
+    {
+        if (status != Status.FOUND)
+        {
+            return nonMagicSkillsAboveThreshold;
+        }
+        if (nonMagicLevels.length == 0)
+        {
+            return nonMagicSkillsAboveThreshold;
+        }
+
+        int count = 0;
+        for (int level : nonMagicLevels)
+        {
+            if (level > threshold)
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
     int getNonMagicTotalLevel()
@@ -142,7 +190,7 @@ final class HiscoreProfile
 
     boolean hasClueOrCollectionLogActivity(int clueCollectionActivityThreshold)
     {
-        return status == Status.FOUND && getClueAndCollectionLogTotal() > clueCollectionActivityThreshold;
+        return status == Status.FOUND && getClueAndCollectionLogTotal() >= Math.max(1, clueCollectionActivityThreshold);
     }
 
     boolean isAtLeastMagicLevel(int threshold)
@@ -158,6 +206,11 @@ final class HiscoreProfile
     boolean hasAtMostNonMagicSkillsAboveThreshold(int threshold)
     {
         return status == Status.FOUND && nonMagicSkillsAboveThreshold <= threshold;
+    }
+
+    boolean hasAtMostNonMagicSkillsAboveThreshold(int nonMagicSkillThreshold, int allowedSkills)
+    {
+        return status == Status.FOUND && getNonMagicSkillsAboveThreshold(nonMagicSkillThreshold) <= allowedSkills;
     }
 
     boolean isMagicDominant()
