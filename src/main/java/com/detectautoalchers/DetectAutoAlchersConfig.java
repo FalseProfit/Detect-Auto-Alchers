@@ -70,7 +70,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "castThreshold",
         name = "Cast threshold",
-        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Set to 0 to allow score-only detection without requiring recent casts. Default: 5 observations.",
+        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Set to 0 to allow fire-staff players to receive hiscore lookups and score-only detection without recent casts. Default: 5 observations.",
         position = 2,
         section = basicSection
     )

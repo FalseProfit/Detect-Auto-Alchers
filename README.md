@@ -15,7 +15,7 @@ The plugin tracks nearby players inside the configured radius and scores them wi
 - A cadence bonus for repeated alchemy observations at a consistent game-tick interval.
 - Score reductions for accounts with enough non-Magic total level or combined clue-scroll completions and collection-log items to look less like fresh alching accounts.
 
-Repeated alchemy behavior is required before a player can be highlighted unless Cast threshold is set to `0`. When the staff requirement is enabled, staff evidence is also required before a scored player can become a suspect.
+Repeated alchemy behavior is required before a player can be highlighted unless Cast threshold is set to `0`. In zero-cast mode, nearby fire-staff players can receive hiscore lookups and become score-only suspects without recent cast observations. When the staff requirement is enabled, staff evidence is also required before a scored player can become a suspect.
 
 RuneLite does not expose a semantic "other player cast High Alchemy" event. Detection is therefore inferred from observable player state.
 
@@ -41,7 +41,7 @@ The plugin never submits reports automatically.
 
 - Detection radius: 15 tiles
 - Observation window: 60 seconds
-- Cast threshold: 5 observations. Set to `0` to allow score-only detection without requiring recent casts.
+- Cast threshold: 5 observations. Set to `0` to allow fire-staff hiscore lookups and score-only detection without requiring recent casts.
 - Moderate confidence threshold: 80
 - High confidence margin: +30, for an effective high confidence threshold of 110
 - Require fire staff: enabled

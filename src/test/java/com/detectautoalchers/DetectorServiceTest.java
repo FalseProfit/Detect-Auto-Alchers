@@ -558,6 +558,28 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void zeroCastThresholdStaffOnlyTriggersHiscoreLookupAndScoreOnlyDetection()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 60);
+        long now = 10_000L;
+        String name = service.updatePlayer("Lookup Score Bot", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(name, config, now));
+
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, true));
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertEquals("Lookup Score Bot", suspects.get(0).getDisplayName());
+        assertEquals(60, suspects.get(0).getScore());
+        assertEquals(0, suspects.get(0).getCastCount());
+        assertFalse(suspects.get(0).isBehaviorMatch());
+        assertTrue(suspects.get(0).isMagicDominant());
+    }
+
+    @Test
     public void singleObservationWithoutStaffDoesNotTriggerHiscoreLookup()
     {
         DetectorService service = new DetectorService();

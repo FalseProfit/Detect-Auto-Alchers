@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +43,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.hiscore.HiscoreClient;
 import net.runelite.client.hiscore.HiscoreEndpoint;
+import net.runelite.client.hiscore.HiscoreResult;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -621,7 +623,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        hiscoreClient.lookupAsync(displayName, HiscoreEndpoint.NORMAL)
+        lookupHiscoreAsync(displayName)
             .whenComplete((result, throwable) ->
             {
                 if (throwable != null)
@@ -640,6 +642,11 @@ public class DetectAutoAlchersPlugin extends Plugin
                     )
                 );
             });
+    }
+
+    CompletableFuture<HiscoreResult> lookupHiscoreAsync(String displayName)
+    {
+        return hiscoreClient.lookupAsync(displayName, HiscoreEndpoint.NORMAL);
     }
 
     private void refreshPanel(long nowMillis)

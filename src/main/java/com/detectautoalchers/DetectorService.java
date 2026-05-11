@@ -230,8 +230,10 @@ final class DetectorService
         }
 
         int castCount = evidence.getObservationCount(nowMillis, config.getObservationWindowMillis());
-        boolean behaviorMatch = config.getCastThreshold() > 0 && castCount >= config.getCastThreshold();
-        boolean candidate = behaviorMatch || (staffMatches(evidence, config) && castCount > 0);
+        boolean castGateDisabled = config.getCastThreshold() == 0;
+        boolean behaviorMatch = !castGateDisabled && castCount >= config.getCastThreshold();
+        boolean candidate = behaviorMatch
+            || (staffMatches(evidence, config) && (castGateDisabled || castCount > 0));
         if (!candidate)
         {
             return false;
