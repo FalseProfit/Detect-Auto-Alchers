@@ -82,7 +82,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
     void refresh(List<SuspicionResult> suspects, long nowMillis)
     {
-        refresh(suspects, nowMillis, Collections.emptyList(), Collections.emptyList(), Collections.emptyMap(), false);
+        refresh(suspects, nowMillis, Collections.emptyList(), Collections.emptyList(), Collections.emptyMap(), null, false);
     }
 
     void refresh(
@@ -91,6 +91,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         Collection<ReportedPlayer> watchedPlayers,
         Collection<ReportedPlayer> overridePlayers,
         Map<String, SuspicionResult> watchedResults,
+        SuspicionResult examinedResult,
         boolean compact)
     {
         if (!SwingUtilities.isEventDispatchThread())
@@ -101,6 +102,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
                 watchedPlayers,
                 overridePlayers,
                 watchedResults,
+                examinedResult,
                 compact
             ));
             return;
@@ -110,6 +112,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addHeader("Suspected auto-alchers");
         addHistoryButtons();
         addPresetButtons();
+        addExaminedPlayer(examinedResult, nowMillis);
+        addSection(content, "Suspects");
         if (suspects.isEmpty())
         {
             addMuted("No suspects in range.");
@@ -136,6 +140,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addHeader("Suspected auto-alchers");
         addHistoryButtons();
         addPresetButtons();
+        addExaminedPlayer(null, System.currentTimeMillis());
+        addSection(content, "Suspects");
         addMuted("No suspects in range.");
     }
 
@@ -216,9 +222,23 @@ final class DetectAutoAlchersPanel extends PluginPanel
         content.add(label);
     }
 
+    private void addExaminedPlayer(SuspicionResult examinedResult, long nowMillis)
+    {
+        addSection(content, "<html>Examine Player Score<br>(Right Click Player Menu)</html>");
+        if (examinedResult == null)
+        {
+            addMuted("No examined player.");
+            content.add(Box.createRigidArea(new Dimension(0, 8)));
+            return;
+        }
+
+        addSuspect(examinedResult, nowMillis, false);
+        content.add(Box.createRigidArea(new Dimension(0, 8)));
+    }
+
     private void addSuspect(SuspicionResult suspect, long nowMillis, boolean compact)
     {
-        Color alert = suspect.isHighConfidence() ? HIGH_CONFIDENCE_ALERT : MODERATE_CONFIDENCE_ALERT;
+        Color alert = alertColor(suspect);
         JPanel row = createRow(alert);
 
         JLabel name = new JLabel(suspect.getDisplayName());
@@ -242,8 +262,21 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
         row.add(details);
         addSuspectButtons(row, suspect);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        row.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, row.getPreferredSize().height));
         content.add(row);
+    }
+
+    private Color alertColor(SuspicionResult suspect)
+    {
+        if (suspect.isHighConfidence())
+        {
+            return HIGH_CONFIDENCE_ALERT;
+        }
+        if (suspect.getConfidence() == DetectionConfidence.MODERATE)
+        {
+            return MODERATE_CONFIDENCE_ALERT;
+        }
+        return MUTED;
     }
 
     private JPanel createRow(Color alert)
@@ -318,7 +351,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addSection(details, "Reductions");
         addDetail(details, "non-magic reduction: " + yesNo(suspect.isMatureAccountSuppressed()));
         addDetail(details, "played activity: " + yesNo(suspect.isClueCollectionActivitySuppressed()));
-        details.setMaximumSize(new Dimension(Integer.MAX_VALUE, details.getPreferredSize().height));
+        details.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, details.getPreferredSize().height));
     }
 
     private void addPlayerList(
@@ -369,7 +402,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
                 row.add(buttons);
             }
 
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+            row.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, row.getPreferredSize().height));
             content.add(row);
             content.add(Box.createRigidArea(new Dimension(0, 6)));
         }

@@ -23,6 +23,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 
 - The scene overlay outlines high-confidence suspects in red and moderate-confidence suspects in yellow.
 - The plugin side panel lists current suspects, confidence, score, casts, hiscore evidence, reductions, and time since last seen.
+- The right-click player menu includes an Examine option that shows the latest manually examined player score in a separate side-panel section without changing detection, watchlist, override, reported, ignore, or mobile suppression state.
 - The side panel can be switched to compact mode for shorter suspect rows.
 - Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
 - Right-click player menu entries are sorted by confidence when menu sorting is enabled: high confidence first, then moderate confidence, then unflagged entries.

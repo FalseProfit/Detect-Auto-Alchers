@@ -8,6 +8,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,7 @@ public class DetectAutoAlchersPanelTest
             Collections.emptyList(),
             Collections.emptyList(),
             Collections.emptyMap(),
+            null,
             true
         ));
 
@@ -120,6 +122,7 @@ public class DetectAutoAlchersPanelTest
             List.of(watched),
             List.of(override),
             Map.of("watched bot", result()),
+            null,
             false
         ));
 
@@ -143,6 +146,36 @@ public class DetectAutoAlchersPanelTest
         assertTrue(containsLabel(panel, "Detection Presets"));
         assertTrue(containsButton(panel, "Conservative"));
         assertTrue(containsButton(panel, "Aggressive"));
+    }
+
+    @Test
+    public void showsExaminedPlayerSectionBeforeSuspectsWithFullDetails()
+        throws InvocationTargetException, InterruptedException
+    {
+        DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
+
+        SwingUtilities.invokeAndWait(() -> panel.refresh(
+            Collections.emptyList(),
+            2_000L,
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            result(),
+            true
+        ));
+
+        assertTrue(containsLabel(panel, "Examine Player Score<br>(Right Click Player Menu)"));
+        assertTrue(containsLabel(panel, "Suspects"));
+        assertTrue(containsLabel(panel, "Compact Alcher"));
+        assertTrue(containsLabel(panel, "positive total: 120"));
+        assertTrue(containsLabel(panel, "detection gate: passed"));
+        assertTrue(containsLabel(panel, "No suspects in range."));
+        assertTrue(containsButton(panel, "Watch"));
+        assertTrue(containsButton(panel, "Override"));
+
+        List<String> labels = labelTexts(panel);
+        assertTrue(labels.indexOf("Detection Presets") < labels.indexOf("<html>Examine Player Score<br>(Right Click Player Menu)</html>"));
+        assertTrue(labels.indexOf("<html>Examine Player Score<br>(Right Click Player Menu)</html>") < labels.indexOf("Suspects"));
     }
 
     private SuspicionResult result()
@@ -227,6 +260,42 @@ public class DetectAutoAlchersPanelTest
     private boolean containsLabel(Component component, String text)
     {
         return findLabel(component, text) != null;
+    }
+
+    private List<String> labelTexts(Component component)
+    {
+        List<String> labels = new ArrayList<>();
+        collectLabelTexts(component, labels);
+        return labels;
+    }
+
+    private void collectLabelTexts(Component component, List<String> labels)
+    {
+        if (component instanceof JLabel)
+        {
+            labels.add(((JLabel) component).getText());
+            return;
+        }
+
+        if (component instanceof JScrollPane)
+        {
+            collectLabelTexts(((JScrollPane) component).getViewport(), labels);
+            return;
+        }
+
+        if (component instanceof JViewport)
+        {
+            collectLabelTexts(((JViewport) component).getView(), labels);
+            return;
+        }
+
+        if (component instanceof JPanel)
+        {
+            for (Component child : ((JPanel) component).getComponents())
+            {
+                collectLabelTexts(child, labels);
+            }
+        }
     }
 
     private int maxButtonRowWidth(Component component)

@@ -21,10 +21,12 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Ignore;
+import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
@@ -63,6 +65,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private static final String CONFIG_GROUP = "detectautoalchers";
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
+    private static final String EXAMINE_OPTION = "Examine Alch Bot";
     private static final long PANEL_REFRESH_INTERVAL_MILLIS = 5_000L;
 
     @Inject
@@ -346,6 +349,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     {
         MenuEntry[] menuEntries = event.getMenuEntries();
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        addExamineMenuEntries(menuEntries);
         if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(menuEntries))
         {
             refreshPanel(System.currentTimeMillis(), true);
@@ -673,8 +677,151 @@ public class DetectAutoAlchersPlugin extends Plugin
             watchlistStore.getReportedPlayers(),
             overrideListStore.getReportedPlayers(),
             detectorService.getResultsByName(watchlistStore.getNormalizedNames()),
+            detectorService.getExaminedResult(),
             config.compactPanelMode()
         );
+    }
+
+    private void addExamineMenuEntries(MenuEntry[] menuEntries)
+    {
+        if (menuEntries == null)
+        {
+            return;
+        }
+
+        Set<String> addedNames = new HashSet<>();
+        int insertedEntries = 0;
+        for (int index = 0; index < menuEntries.length; index++)
+        {
+            MenuEntry entry = menuEntries[index];
+            if (entry == null || !MenuHighlighter.isPlayerMenuEntry(entry))
+            {
+                continue;
+            }
+            if (!"report".equalsIgnoreCase(MenuHighlighter.cleanText(entry.getOption())))
+            {
+                continue;
+            }
+
+            String displayName = getPlayerName(entry);
+            String normalizedName = DetectorService.normalizeName(displayName);
+            if (normalizedName.isEmpty() || !addedNames.add(normalizedName))
+            {
+                continue;
+            }
+
+            Player player = entry.getPlayer();
+            String target = entry.getTarget();
+            client.createMenuEntry(index + 1 + insertedEntries)
+                .setOption(EXAMINE_OPTION)
+                .setTarget(target == null || target.isEmpty() ? displayName : target)
+                .setType(MenuAction.RUNELITE_PLAYER)
+                .onClick(clicked -> examinePlayer(displayName, player));
+            insertedEntries++;
+        }
+    }
+
+    private void examinePlayer(String displayName, Player menuPlayer)
+    {
+        long nowMillis = System.currentTimeMillis();
+        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        Player player = menuPlayer == null ? findPlayer(displayName) : menuPlayer;
+        String normalizedName = detectorService.examinePlayer(
+            displayName,
+            client.getWorld(),
+            distanceToLocalPlayer(player),
+            player == null ? -1 : getWeaponId(player),
+            snapshot,
+            nowMillis
+        );
+        refreshPanel(nowMillis, true);
+        openPanel();
+        requestExaminedHiscoreIfNeeded(displayName, normalizedName, snapshot, nowMillis);
+    }
+
+    private void openPanel()
+    {
+        if (navButton != null)
+        {
+            SwingUtilities.invokeLater(() -> clientToolbar.openPanel(navButton));
+        }
+    }
+
+    private void requestExaminedHiscoreIfNeeded(
+        String displayName,
+        String normalizedName,
+        DetectorConfigSnapshot snapshot,
+        long nowMillis)
+    {
+        if (normalizedName.isEmpty()
+            || !detectorService.markExaminedHiscoreLookupIfNeeded(normalizedName, snapshot, nowMillis))
+        {
+            return;
+        }
+
+        refreshPanel(nowMillis, true);
+        lookupHiscoreAsync(displayName)
+            .whenComplete((result, throwable) ->
+            {
+                long completedAtMillis = System.currentTimeMillis();
+                if (throwable != null)
+                {
+                    detectorService.applyExaminedHiscore(
+                        normalizedName,
+                        HiscoreProfile.error(),
+                        snapshot,
+                        completedAtMillis
+                    );
+                    refreshPanel(completedAtMillis, true);
+                    return;
+                }
+
+                detectorService.applyExaminedHiscore(
+                    normalizedName,
+                    HiscoreAnalyzer.analyze(
+                        result,
+                        snapshot.getMagicLevelThreshold(),
+                        snapshot.getNonMagicSkillThreshold(),
+                        snapshot.getAllowedNonMagicSkillsAboveThreshold()
+                    ),
+                    snapshot,
+                    completedAtMillis
+                );
+                refreshPanel(completedAtMillis, true);
+            });
+    }
+
+    private Player findPlayer(String displayName)
+    {
+        WorldView worldView = client.getTopLevelWorldView();
+        if (worldView == null)
+        {
+            return null;
+        }
+
+        String normalizedName = DetectorService.normalizeName(displayName);
+        for (Player player : worldView.players())
+        {
+            if (player != null && normalizedName.equals(DetectorService.normalizeName(player.getName())))
+            {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    private int distanceToLocalPlayer(Player player)
+    {
+        Player localPlayer = client.getLocalPlayer();
+        if (player == null
+            || localPlayer == null
+            || player.getWorldLocation() == null
+            || localPlayer.getWorldLocation() == null)
+        {
+            return -1;
+        }
+
+        return player.getWorldLocation().distanceTo(localPlayer.getWorldLocation());
     }
 
     private void recordListEntry(

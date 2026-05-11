@@ -33,6 +33,26 @@ final class PlayerEvidence
         this.displayName = displayName;
     }
 
+    PlayerEvidence copy()
+    {
+        PlayerEvidence copy = new PlayerEvidence(normalizedName, displayName);
+        copy.observations.addAll(observations);
+        copy.world = world;
+        copy.distance = distance;
+        copy.weaponId = weaponId;
+        copy.basicFireStaff = basicFireStaff;
+        copy.fireRuneProvider = fireRuneProvider;
+        copy.lastSeenMillis = lastSeenMillis;
+        copy.lastHiscoreLookupMillis = lastHiscoreLookupMillis;
+        copy.hiscoreLookupInFlight = hiscoreLookupInFlight;
+        copy.hiscoreProfile = hiscoreProfile;
+        copy.lastResult = lastResult;
+        copy.lastObservationTick = lastObservationTick;
+        copy.lastObservationId = lastObservationId;
+        copy.lastObservationSource = lastObservationSource;
+        return copy;
+    }
+
     void updateSeen(String displayName, int world, int distance, int weaponId, long nowMillis)
     {
         this.displayName = displayName;

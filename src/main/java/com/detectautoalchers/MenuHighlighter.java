@@ -267,7 +267,7 @@ final class MenuHighlighter
         return Text.removeTags(target == null ? "" : target);
     }
 
-    private static boolean isPlayerMenuEntry(MenuEntry entry)
+    static boolean isPlayerMenuEntry(MenuEntry entry)
     {
         if (entry.getPlayer() != null)
         {

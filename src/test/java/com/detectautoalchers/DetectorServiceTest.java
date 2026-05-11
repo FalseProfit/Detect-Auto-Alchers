@@ -404,6 +404,46 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void examinedPlayerScoresWithoutEnteringNormalSuspectListOrChangingSuppression()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        service.suppressName("Reported Examine", SuppressionReason.REPORTED);
+        String name = service.examinePlayer("Reported Examine", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now);
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(name, config, now));
+        service.applyExaminedHiscore(name, HiscoreProfile.found(82, 1, 40, true), config, now + 1_000L);
+
+        SuspicionResult examinedResult = service.getExaminedResult();
+
+        assertTrue(service.isSuppressed("Reported Examine"));
+        assertTrue(service.getSuspiciousResults().isEmpty());
+        assertEquals("Reported Examine", examinedResult.getDisplayName());
+        assertEquals(60, examinedResult.getScore());
+        assertEquals("found", examinedResult.getHiscoreStatus());
+        assertFalse(examinedResult.getScoreBreakdown().isDetectionGatePassed());
+    }
+
+    @Test
+    public void examiningNewPlayerReplacesPreviousExaminedResult()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        service.examinePlayer("First Examine", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now);
+        service.examinePlayer("Second Examine", 301, 6, -1, config, now + 1_000L);
+
+        SuspicionResult examinedResult = service.getExaminedResult();
+
+        assertEquals("Second Examine", examinedResult.getDisplayName());
+        assertEquals(0, examinedResult.getScore());
+        assertFalse(service.getScoresByName().containsKey("first examine"));
+        assertFalse(service.getScoresByName().containsKey("second examine"));
+    }
+
+    @Test
     public void suppressionReasonsDoNotClearEachOther()
     {
         DetectorService service = new DetectorService();

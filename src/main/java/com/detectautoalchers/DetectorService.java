@@ -17,16 +17,19 @@ final class DetectorService
     private static final long STALE_MULTIPLIER = 2L;
     private final Map<String, PlayerEvidence> evidenceByName = new LinkedHashMap<>();
     private final Map<String, EnumSet<SuppressionReason>> suppressionReasonsByName = new LinkedHashMap<>();
+    private PlayerEvidence examinedEvidence;
 
     synchronized void clear()
     {
         evidenceByName.clear();
         suppressionReasonsByName.clear();
+        examinedEvidence = null;
     }
 
     synchronized void clearEvidence()
     {
         evidenceByName.clear();
+        examinedEvidence = null;
     }
 
     synchronized void suppressName(String displayName)
@@ -191,6 +194,10 @@ final class DetectorService
         {
             evidence.setLastResult(score(evidence, config, nowMillis));
         }
+        if (examinedEvidence != null)
+        {
+            examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
+        }
     }
 
     synchronized void pruneStale(long nowMillis, long observationWindowMillis)
@@ -256,6 +263,49 @@ final class DetectorService
         return true;
     }
 
+    synchronized String examinePlayer(
+        String displayName,
+        int world,
+        int distance,
+        int weaponId,
+        DetectorConfigSnapshot config,
+        long nowMillis)
+    {
+        String normalizedName = normalizeName(displayName);
+        if (normalizedName.isEmpty())
+        {
+            return "";
+        }
+
+        PlayerEvidence existingEvidence = evidenceByName.get(normalizedName);
+        PlayerEvidence evidence = existingEvidence == null
+            ? new PlayerEvidence(normalizedName, displayName)
+            : existingEvidence.copy();
+        evidence.updateSeen(displayName, world, distance, weaponId, nowMillis);
+        evidence.setHiscoreLookupInFlight(false);
+        evidence.setLastResult(score(evidence, config, nowMillis));
+        examinedEvidence = evidence;
+        return normalizedName;
+    }
+
+    synchronized boolean markExaminedHiscoreLookupIfNeeded(String normalizedName, DetectorConfigSnapshot config, long nowMillis)
+    {
+        if (!config.isEnableHiscoreScoring()
+            || examinedEvidence == null
+            || !examinedEvidence.getNormalizedName().equals(normalizeName(normalizedName))
+            || examinedEvidence.isHiscoreLookupInFlight()
+            || examinedEvidence.getHiscoreProfile().isTerminalSuccess())
+        {
+            return false;
+        }
+
+        examinedEvidence.setLastHiscoreLookupMillis(nowMillis);
+        examinedEvidence.setHiscoreLookupInFlight(true);
+        examinedEvidence.setHiscoreProfile(HiscoreProfile.pending());
+        examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
+        return true;
+    }
+
     synchronized int getHiscoreLookupsInFlight()
     {
         int count = 0;
@@ -284,6 +334,27 @@ final class DetectorService
 
         evidence.setHiscoreLookupInFlight(false);
         evidence.setHiscoreProfile(hiscoreProfile);
+    }
+
+    synchronized void applyExaminedHiscore(
+        String normalizedName,
+        HiscoreProfile hiscoreProfile,
+        DetectorConfigSnapshot config,
+        long nowMillis)
+    {
+        if (examinedEvidence == null || !examinedEvidence.getNormalizedName().equals(normalizeName(normalizedName)))
+        {
+            return;
+        }
+
+        examinedEvidence.setHiscoreLookupInFlight(false);
+        examinedEvidence.setHiscoreProfile(hiscoreProfile);
+        examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
+    }
+
+    synchronized SuspicionResult getExaminedResult()
+    {
+        return examinedEvidence == null ? null : examinedEvidence.getLastResult();
     }
 
     synchronized List<SuspicionResult> getSuspiciousResults()
