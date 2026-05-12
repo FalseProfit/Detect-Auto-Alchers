@@ -85,6 +85,10 @@ final class MenuHighlighter
             {
                 continue;
             }
+            if (!isReportOption(entry.getOption()))
+            {
+                continue;
+            }
 
             String normalizedName = normalizedPlayerName(entry);
             int score = scores.getOrDefault(normalizedName, 0);

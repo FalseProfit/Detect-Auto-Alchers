@@ -143,6 +143,23 @@ public class MenuHighlighterTest
     }
 
     @Test
+    public void appendsDetectionScoreOnlyToReportEntries()
+    {
+        MenuEntry follow = testMenuEntry("Follow", "<col=ffffff>Username<col=ff0000> (level-98)");
+        MenuEntry report = testMenuEntry("Report", "<col=ffffff>Username<col=ff0000> (level-98)");
+
+        MenuHighlighter.appendScores(
+            new MenuEntry[]{follow, report},
+            Collections.singletonMap("username", 120),
+            80,
+            110
+        );
+
+        assertEquals("<col=ffffff>Username<col=ff0000> (level-98)", follow.getTarget());
+        assertTrue(report.getTarget().contains("Alch Bot Score: 120"));
+    }
+
+    @Test
     public void appendsZeroForUnknownPlayerScores()
     {
         MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Unknown Player<col=ff0000> (level-98)");

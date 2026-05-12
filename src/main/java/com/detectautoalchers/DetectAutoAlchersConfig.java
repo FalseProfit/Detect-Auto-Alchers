@@ -228,10 +228,22 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "rightClickExaminePlayers",
+        name = "Right-click 'Examine' Players",
+        description = "Add an Examine Alch Bot option below Report in player right-click menus. Default: on.",
+        position = 14,
+        section = basicSection
+    )
+    default boolean rightClickExaminePlayers()
+    {
+        return true;
+    }
+
+    @ConfigItem(
         keyName = "persistReportedPlayers",
         name = "Persist reported players",
         description = "Save reported players locally so they are not suggested again after restarting RuneLite. Default: on.",
-        position = 14,
+        position = 15,
         section = basicSection
     )
     default boolean persistReportedPlayers()
@@ -243,7 +255,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "highlightReportedPlayers",
         name = "Highlight reported players",
         description = "Draw a separate outline around players already saved in local report history. Default: on.",
-        position = 15,
+        position = 16,
         section = basicSection
     )
     default boolean highlightReportedPlayers()
@@ -255,7 +267,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "reportedPlayerHighlightColor",
         name = "Reported highlight color",
         description = "Outline color for players already saved in local report history. Default: RGB 144,238,144.",
-        position = 16,
+        position = 17,
         section = basicSection
     )
     default Color reportedPlayerHighlightColor()
@@ -267,7 +279,7 @@ public interface DetectAutoAlchersConfig extends Config
         keyName = "compactPanelMode",
         name = "Compact panel mode",
         description = "Show shorter suspect rows in the side panel. Default: off.",
-        position = 17,
+        position = 18,
         section = basicSection
     )
     default boolean compactPanelMode()
@@ -278,7 +290,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "showMenuDetectionScores",
         name = "Show menu detection scores",
-        description = "Show each right-clicked player's current detection score for debugging. Unknown, untracked, and suppressed players display 0. Default: off.",
+        description = "Show each right-clicked player's current detection score on their Report option for debugging. Unknown, untracked, and suppressed players display 0. Default: off.",
         position = 0,
         section = debugSection
     )

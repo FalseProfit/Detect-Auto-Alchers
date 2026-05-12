@@ -349,7 +349,10 @@ public class DetectAutoAlchersPlugin extends Plugin
     {
         MenuEntry[] menuEntries = event.getMenuEntries();
         DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
-        addExamineMenuEntries(menuEntries);
+        if (config.rightClickExaminePlayers())
+        {
+            addExamineMenuEntries(menuEntries);
+        }
         if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(menuEntries))
         {
             refreshPanel(System.currentTimeMillis(), true);
@@ -712,7 +715,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
             Player player = entry.getPlayer();
             String target = entry.getTarget();
-            client.createMenuEntry(index + 1 + insertedEntries)
+            client.createMenuEntry(index + insertedEntries)
                 .setOption(EXAMINE_OPTION)
                 .setTarget(target == null || target.isEmpty() ? displayName : target)
                 .setType(MenuAction.RUNELITE_PLAYER)
