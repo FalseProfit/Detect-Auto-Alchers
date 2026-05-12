@@ -678,6 +678,26 @@ public class DetectorServiceTest
         assertTrue(service.markHiscoreLookupIfNeeded(fourth, config, now));
     }
 
+    @Test
+    public void staleHiscoreLookupExpirationFreesCapacityAndMarksError()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = addLookupCandidate(service, "Stale Lookup", now, config);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(name, config, now));
+
+        service.expireStaleHiscoreLookups(now + 9_999L, 10_000L);
+        assertEquals(1, service.getHiscoreLookupsInFlight());
+
+        service.expireStaleHiscoreLookups(now + 10_001L, 10_000L);
+        service.recompute(config, now + 10_001L);
+
+        assertEquals(0, service.getHiscoreLookupsInFlight());
+        assertEquals("error", service.getResultsByName(Set.of(name)).get(name).getHiscoreStatus());
+    }
+
     private void recordFiveAlchs(DetectorService service, String displayName, long now, DetectorConfigSnapshot config)
     {
         for (int i = 0; i < 5; i++)

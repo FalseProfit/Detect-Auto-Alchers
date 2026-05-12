@@ -214,6 +214,18 @@ final class DetectorService
         }
     }
 
+    synchronized void expireStaleHiscoreLookups(long nowMillis, long maxPendingMillis)
+    {
+        for (PlayerEvidence evidence : evidenceByName.values())
+        {
+            expireStaleHiscoreLookup(evidence, nowMillis, maxPendingMillis);
+        }
+        if (examinedEvidence != null)
+        {
+            expireStaleHiscoreLookup(examinedEvidence, nowMillis, maxPendingMillis);
+        }
+    }
+
     synchronized boolean markHiscoreLookupIfNeeded(
         String normalizedName,
         DetectorConfigSnapshot config,
@@ -605,5 +617,18 @@ final class DetectorService
         return config.isIncludeFireRuneStaves()
             ? evidence.hasFireRuneProvider()
             : evidence.hasBasicFireStaff();
+    }
+
+    private void expireStaleHiscoreLookup(PlayerEvidence evidence, long nowMillis, long maxPendingMillis)
+    {
+        if (!evidence.isHiscoreLookupInFlight()
+            || evidence.getLastHiscoreLookupMillis() <= 0
+            || nowMillis - evidence.getLastHiscoreLookupMillis() <= maxPendingMillis)
+        {
+            return;
+        }
+
+        evidence.setHiscoreLookupInFlight(false);
+        evidence.setHiscoreProfile(HiscoreProfile.error());
     }
 }

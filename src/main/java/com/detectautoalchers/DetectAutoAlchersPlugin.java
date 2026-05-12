@@ -67,6 +67,13 @@ public class DetectAutoAlchersPlugin extends Plugin
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
     private static final String EXAMINE_OPTION = "Examine Alch Bot";
     private static final long PANEL_REFRESH_INTERVAL_MILLIS = 5_000L;
+    private static final long HISCORE_LOOKUP_TIMEOUT_MILLIS = 10_000L;
+    private static final long HISCORE_LOOKUP_RETRY_DELAY_MILLIS = 1_500L;
+    private static final int HISCORE_LOOKUP_MAX_ATTEMPTS = 2;
+    private static final long HISCORE_LOOKUP_STALE_MILLIS =
+        (HISCORE_LOOKUP_TIMEOUT_MILLIS * HISCORE_LOOKUP_MAX_ATTEMPTS)
+            + (HISCORE_LOOKUP_RETRY_DELAY_MILLIS * (HISCORE_LOOKUP_MAX_ATTEMPTS - 1))
+            + 5_000L;
 
     @Inject
     private Client client;
@@ -340,6 +347,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             detectorService.suppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
         }
         detectorService.pruneStale(nowMillis, snapshot.getObservationWindowMillis());
+        detectorService.expireStaleHiscoreLookups(nowMillis, HISCORE_LOOKUP_STALE_MILLIS);
         detectorService.recompute(snapshot, nowMillis);
         refreshPanel(nowMillis);
     }
@@ -630,12 +638,16 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
-        lookupHiscoreAsync(displayName)
+        refreshPanel(nowMillis, true);
+        lookupHiscoreWithRetry(displayName)
             .whenComplete((result, throwable) ->
             {
+                long completedAtMillis = System.currentTimeMillis();
                 if (throwable != null)
                 {
                     detectorService.applyHiscore(normalizedName, HiscoreProfile.error());
+                    detectorService.recompute(snapshot, completedAtMillis);
+                    refreshPanel(completedAtMillis, true);
                     return;
                 }
 
@@ -648,12 +660,72 @@ public class DetectAutoAlchersPlugin extends Plugin
                         snapshot.getAllowedNonMagicSkillsAboveThreshold()
                     )
                 );
+                detectorService.recompute(snapshot, completedAtMillis);
+                refreshPanel(completedAtMillis, true);
             });
     }
 
     CompletableFuture<HiscoreResult> lookupHiscoreAsync(String displayName)
     {
         return hiscoreClient.lookupAsync(displayName, HiscoreEndpoint.NORMAL);
+    }
+
+    private CompletableFuture<HiscoreResult> lookupHiscoreWithRetry(String displayName)
+    {
+        return lookupHiscoreAttempt(displayName, 1);
+    }
+
+    private CompletableFuture<HiscoreResult> lookupHiscoreAttempt(String displayName, int attempt)
+    {
+        CompletableFuture<HiscoreResult> attemptFuture;
+        try
+        {
+            attemptFuture = lookupHiscoreAsync(displayName);
+        }
+        catch (RuntimeException ex)
+        {
+            attemptFuture = CompletableFuture.failedFuture(ex);
+        }
+
+        return attemptFuture
+            .orTimeout(hiscoreLookupTimeoutMillis(), TimeUnit.MILLISECONDS)
+            .handle((result, throwable) ->
+            {
+                if (throwable == null)
+                {
+                    return CompletableFuture.completedFuture(result);
+                }
+
+                if (attempt >= HISCORE_LOOKUP_MAX_ATTEMPTS || ioExecutor == null || ioExecutor.isShutdown())
+                {
+                    CompletableFuture<HiscoreResult> failed = new CompletableFuture<>();
+                    failed.completeExceptionally(throwable);
+                    return failed;
+                }
+
+                log.debug("Hiscore lookup attempt {} failed for {}", attempt, displayName, throwable);
+                return CompletableFuture
+                    .supplyAsync(
+                        () -> null,
+                        CompletableFuture.delayedExecutor(
+                            hiscoreLookupRetryDelayMillis(),
+                            TimeUnit.MILLISECONDS,
+                            ioExecutor
+                        )
+                    )
+                    .thenCompose(ignored -> lookupHiscoreAttempt(displayName, attempt + 1));
+            })
+            .thenCompose(future -> future);
+    }
+
+    long hiscoreLookupTimeoutMillis()
+    {
+        return HISCORE_LOOKUP_TIMEOUT_MILLIS;
+    }
+
+    long hiscoreLookupRetryDelayMillis()
+    {
+        return HISCORE_LOOKUP_RETRY_DELAY_MILLIS;
     }
 
     private void refreshPanel(long nowMillis)
@@ -763,7 +835,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         refreshPanel(nowMillis, true);
-        lookupHiscoreAsync(displayName)
+        lookupHiscoreWithRetry(displayName)
             .whenComplete((result, throwable) ->
             {
                 long completedAtMillis = System.currentTimeMillis();
