@@ -2,6 +2,7 @@ package com.detectautoalchers;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -186,7 +187,14 @@ final class ReportedPlayerStore
 
         Path temp = destination.resolveSibling(destination.getFileName() + ".tmp");
         Files.write(temp, lines, StandardCharsets.UTF_8);
-        Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        try
+        {
+            Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        }
+        catch (AtomicMoveNotSupportedException ex)
+        {
+            Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private static String csv(String value)

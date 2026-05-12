@@ -17,18 +17,21 @@ final class DetectorService
     private static final long STALE_MULTIPLIER = 2L;
     private final Map<String, PlayerEvidence> evidenceByName = new LinkedHashMap<>();
     private final Map<String, EnumSet<SuppressionReason>> suppressionReasonsByName = new LinkedHashMap<>();
+    private final Map<String, Long> examinedHiscoreLookupMillisByName = new LinkedHashMap<>();
     private PlayerEvidence examinedEvidence;
 
     synchronized void clear()
     {
         evidenceByName.clear();
         suppressionReasonsByName.clear();
+        examinedHiscoreLookupMillisByName.clear();
         examinedEvidence = null;
     }
 
     synchronized void clearEvidence()
     {
         evidenceByName.clear();
+        examinedHiscoreLookupMillisByName.clear();
         examinedEvidence = null;
     }
 
@@ -220,9 +223,23 @@ final class DetectorService
         {
             expireStaleHiscoreLookup(evidence, nowMillis, maxPendingMillis);
         }
-        if (examinedEvidence != null)
+        Iterator<Map.Entry<String, Long>> iterator = examinedHiscoreLookupMillisByName.entrySet().iterator();
+        while (iterator.hasNext())
         {
-            expireStaleHiscoreLookup(examinedEvidence, nowMillis, maxPendingMillis);
+            Map.Entry<String, Long> entry = iterator.next();
+            if (nowMillis - entry.getValue() <= maxPendingMillis)
+            {
+                continue;
+            }
+
+            if (examinedEvidence != null
+                && examinedEvidence.getNormalizedName().equals(entry.getKey())
+                && examinedEvidence.isHiscoreLookupInFlight())
+            {
+                examinedEvidence.setHiscoreLookupInFlight(false);
+                examinedEvidence.setHiscoreProfile(HiscoreProfile.error());
+            }
+            iterator.remove();
         }
     }
 
@@ -294,7 +311,12 @@ final class DetectorService
             ? new PlayerEvidence(normalizedName, displayName)
             : existingEvidence.copy();
         evidence.updateSeen(displayName, world, distance, weaponId, nowMillis);
-        evidence.setHiscoreLookupInFlight(false);
+        boolean examinedLookupInFlight = examinedHiscoreLookupMillisByName.containsKey(normalizedName);
+        evidence.setHiscoreLookupInFlight(examinedLookupInFlight);
+        if (examinedLookupInFlight)
+        {
+            evidence.setHiscoreProfile(HiscoreProfile.pending());
+        }
         evidence.setLastResult(score(evidence, config, nowMillis));
         examinedEvidence = evidence;
         return normalizedName;
@@ -302,11 +324,24 @@ final class DetectorService
 
     synchronized boolean markExaminedHiscoreLookupIfNeeded(String normalizedName, DetectorConfigSnapshot config, long nowMillis)
     {
+        String normalized = normalizeName(normalizedName);
         if (!config.isEnableHiscoreScoring()
             || examinedEvidence == null
-            || !examinedEvidence.getNormalizedName().equals(normalizeName(normalizedName))
+            || !examinedEvidence.getNormalizedName().equals(normalized)
             || examinedEvidence.isHiscoreLookupInFlight()
+            || examinedHiscoreLookupMillisByName.containsKey(normalized)
             || examinedEvidence.getHiscoreProfile().isTerminalSuccess())
+        {
+            return false;
+        }
+
+        if (!hasHiscoreLookupCapacity())
+        {
+            return false;
+        }
+
+        if (examinedEvidence.getLastHiscoreLookupMillis() > 0
+            && nowMillis - examinedEvidence.getLastHiscoreLookupMillis() < config.getHiscoreCooldownMillis())
         {
             return false;
         }
@@ -315,6 +350,7 @@ final class DetectorService
         examinedEvidence.setHiscoreLookupInFlight(true);
         examinedEvidence.setHiscoreProfile(HiscoreProfile.pending());
         examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
+        examinedHiscoreLookupMillisByName.put(examinedEvidence.getNormalizedName(), nowMillis);
         return true;
     }
 
@@ -328,7 +364,7 @@ final class DetectorService
                 count++;
             }
         }
-        return count;
+        return count + examinedHiscoreLookupMillisByName.size();
     }
 
     synchronized boolean hasHiscoreLookupCapacity()
@@ -354,7 +390,9 @@ final class DetectorService
         DetectorConfigSnapshot config,
         long nowMillis)
     {
-        if (examinedEvidence == null || !examinedEvidence.getNormalizedName().equals(normalizeName(normalizedName)))
+        String normalized = normalizeName(normalizedName);
+        examinedHiscoreLookupMillisByName.remove(normalized);
+        if (examinedEvidence == null || !examinedEvidence.getNormalizedName().equals(normalized))
         {
             return;
         }

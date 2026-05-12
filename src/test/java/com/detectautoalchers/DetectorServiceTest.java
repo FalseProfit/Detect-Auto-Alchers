@@ -679,6 +679,84 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void examinedHiscoreLookupCountsAgainstCapacity()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String first = addLookupCandidate(service, "Lookup One", now, config);
+        String second = addLookupCandidate(service, "Lookup Two", now, config);
+
+        assertTrue(service.markHiscoreLookupIfNeeded(first, config, now));
+        assertTrue(service.markHiscoreLookupIfNeeded(second, config, now));
+
+        String examined = service.examinePlayer(
+            "Examined Lookup",
+            301,
+            4,
+            StaffClassifier.STAFF_OF_FIRE,
+            config,
+            now
+        );
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(examined, config, now));
+        assertEquals(3, service.getHiscoreLookupsInFlight());
+
+        String third = addLookupCandidate(service, "Lookup Three", now, config);
+        assertFalse(service.markHiscoreLookupIfNeeded(third, config, now));
+    }
+
+    @Test
+    public void replacingExaminedPlayerDoesNotForgetPendingLookupCapacity()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+
+        String first = service.examinePlayer("Examined One", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now);
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(first, config, now));
+        String second = service.examinePlayer("Examined Two", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now + 1_000L);
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(second, config, now + 1_000L));
+        String third = service.examinePlayer("Examined Three", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now + 2_000L);
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(third, config, now + 2_000L));
+
+        String fourth = service.examinePlayer("Examined Four", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now + 3_000L);
+
+        assertEquals(3, service.getHiscoreLookupsInFlight());
+        assertFalse(service.markExaminedHiscoreLookupIfNeeded(fourth, config, now + 3_000L));
+
+        service.applyExaminedHiscore(first, HiscoreProfile.error(), config, now + 4_000L);
+
+        assertEquals(2, service.getHiscoreLookupsInFlight());
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(fourth, config, now + 4_000L));
+    }
+
+    @Test
+    public void examinedHiscoreLookupUsesCooldownAfterFailure()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String examined = service.examinePlayer(
+            "Examined Cooldown",
+            301,
+            4,
+            StaffClassifier.STAFF_OF_FIRE,
+            config,
+            now
+        );
+
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(examined, config, now));
+        service.applyExaminedHiscore(examined, HiscoreProfile.error(), config, now + 1_000L);
+
+        assertFalse(service.markExaminedHiscoreLookupIfNeeded(examined, config, now + 2_000L));
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(
+            examined,
+            config,
+            now + config.getHiscoreCooldownMillis() + 1L
+        ));
+    }
+
+    @Test
     public void staleHiscoreLookupExpirationFreesCapacityAndMarksError()
     {
         DetectorService service = new DetectorService();

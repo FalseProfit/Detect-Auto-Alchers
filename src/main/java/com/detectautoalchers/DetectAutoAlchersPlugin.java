@@ -113,6 +113,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
     private ExecutorService ioExecutor;
+    private DetectorConfigSnapshot configSnapshot;
     private final Set<String> mobilePlayerNames = new HashSet<>();
     private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
 
@@ -163,6 +164,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         });
         mobilePlayerNames.clear();
         detectorService.clear();
+        configSnapshot = DetectorConfigSnapshot.from(config);
 
         panel = new DetectAutoAlchersPanel(new PanelActions());
         navButton = NavigationButton.builder()
@@ -187,6 +189,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         panel = null;
+        configSnapshot = null;
         panelRefreshGate.reset();
         mobilePlayerNames.clear();
         detectorService.clear();
@@ -221,7 +224,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             }
             else
             {
-                detectorService.unsuppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
+                clearMobileSuppressions();
             }
         }
         else if ("persistReportedPlayers".equals(event.getKey()))
@@ -237,7 +240,8 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         long nowMillis = System.currentTimeMillis();
-        detectorService.recompute(DetectorConfigSnapshot.from(config), nowMillis);
+        configSnapshot = DetectorConfigSnapshot.from(config);
+        detectorService.recompute(snapshot(), nowMillis);
         refreshPanel(nowMillis, true);
     }
 
@@ -247,6 +251,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         GameState state = event.getGameState();
         if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
         {
+            clearMobileSuppressions();
             detectorService.clearEvidence();
             refreshPanel(System.currentTimeMillis(), true);
         }
@@ -260,7 +265,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             return;
         }
-        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        DetectorConfigSnapshot snapshot = snapshot();
         if (isObservedMobilePlayer(actor.getName(), snapshot))
         {
             detectorService.suppressName(actor.getName(), SuppressionReason.MOBILE);
@@ -296,7 +301,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         long nowMillis = System.currentTimeMillis();
-        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        DetectorConfigSnapshot snapshot = snapshot();
         WorldView worldView = client.getTopLevelWorldView();
         Player localPlayer = client.getLocalPlayer();
         if (worldView == null || localPlayer == null)
@@ -356,7 +361,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     public void onMenuOpened(MenuOpened event)
     {
         MenuEntry[] menuEntries = event.getMenuEntries();
-        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        DetectorConfigSnapshot snapshot = snapshot();
         if (config.rightClickExaminePlayers())
         {
             addExamineMenuEntries(menuEntries);
@@ -484,6 +489,15 @@ public class DetectAutoAlchersPlugin extends Plugin
         return menuEntry == null ? "" : MenuHighlighter.extractPlayerNameFromTarget(menuEntry.getTarget());
     }
 
+    private DetectorConfigSnapshot snapshot()
+    {
+        if (configSnapshot == null)
+        {
+            configSnapshot = DetectorConfigSnapshot.from(config);
+        }
+        return configSnapshot;
+    }
+
     private boolean suppressMobilePlayer(String displayName)
     {
         String normalizedName = DetectorService.normalizeName(displayName);
@@ -495,6 +509,12 @@ public class DetectAutoAlchersPlugin extends Plugin
         boolean added = mobilePlayerNames.add(normalizedName);
         detectorService.suppressName(normalizedName, SuppressionReason.MOBILE);
         return added;
+    }
+
+    private void clearMobileSuppressions()
+    {
+        detectorService.unsuppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
+        mobilePlayerNames.clear();
     }
 
     private boolean isObservedMobilePlayer(String displayName, DetectorConfigSnapshot snapshot)
@@ -799,7 +819,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private void examinePlayer(String displayName, Player menuPlayer)
     {
         long nowMillis = System.currentTimeMillis();
-        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        DetectorConfigSnapshot snapshot = snapshot();
         Player player = menuPlayer == null ? findPlayer(displayName) : menuPlayer;
         String normalizedName = detectorService.examinePlayer(
             displayName,

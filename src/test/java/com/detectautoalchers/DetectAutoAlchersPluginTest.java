@@ -1,6 +1,8 @@
 package com.detectautoalchers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
@@ -22,6 +24,26 @@ import org.junit.Test;
 
 public class DetectAutoAlchersPluginTest
 {
+    @Test
+    public void clearingMobileSuppressionsRemovesOnlyMobileReason() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        DetectorService detectorService = new DetectorService();
+        setField(plugin, "detectorService", detectorService);
+
+        invokePrivate(plugin, "suppressMobilePlayer", new Class<?>[]{String.class}, "Mobile Alcher");
+        detectorService.suppressName("Layered Mobile", SuppressionReason.REPORTED);
+        invokePrivate(plugin, "suppressMobilePlayer", new Class<?>[]{String.class}, "Layered Mobile");
+
+        assertTrue(detectorService.isSuppressed("Mobile Alcher"));
+        assertTrue(detectorService.isSuppressed("Layered Mobile"));
+
+        invokePrivate(plugin, "clearMobileSuppressions", new Class<?>[0]);
+
+        assertFalse(detectorService.isSuppressed("Mobile Alcher"));
+        assertTrue(detectorService.isSuppressed("Layered Mobile"));
+    }
+
     @Test
     public void zeroCastThresholdStaffOnlyCandidateReachesLiveHiscoreLookupPath() throws Exception
     {
@@ -149,6 +171,29 @@ public class DetectAutoAlchersPluginTest
         Field field = DetectAutoAlchersPlugin.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static Object invokePrivate(
+        DetectAutoAlchersPlugin plugin,
+        String name,
+        Class<?>[] parameterTypes,
+        Object... args) throws Exception
+    {
+        Method method = DetectAutoAlchersPlugin.class.getDeclaredMethod(name, parameterTypes);
+        method.setAccessible(true);
+        try
+        {
+            return method.invoke(plugin, args);
+        }
+        catch (InvocationTargetException ex)
+        {
+            Throwable cause = ex.getCause();
+            if (cause instanceof Exception)
+            {
+                throw (Exception) cause;
+            }
+            throw ex;
+        }
     }
 
     private static DetectorConfigSnapshot configWithCastAndModerateThreshold(int castThreshold, int moderateThreshold)
