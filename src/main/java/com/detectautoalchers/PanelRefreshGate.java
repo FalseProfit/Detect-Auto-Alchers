@@ -15,7 +15,16 @@ final class PanelRefreshGate
 
     synchronized boolean shouldRefresh(List<SuspicionResult> suspects, long nowMillis, boolean force)
     {
-        String snapshot = snapshot(suspects);
+        return shouldRefresh(suspects, null, nowMillis, force);
+    }
+
+    synchronized boolean shouldRefresh(
+        List<SuspicionResult> suspects,
+        SuspicionResult examinedResult,
+        long nowMillis,
+        boolean force)
+    {
+        String snapshot = snapshot(suspects, examinedResult);
         boolean changed = !snapshot.equals(lastSnapshot);
         boolean intervalElapsed = lastRefreshMillis == Long.MIN_VALUE
             || nowMillis - lastRefreshMillis >= refreshIntervalMillis;
@@ -35,7 +44,7 @@ final class PanelRefreshGate
         lastRefreshMillis = Long.MIN_VALUE;
     }
 
-    private String snapshot(List<SuspicionResult> suspects)
+    private String snapshot(List<SuspicionResult> suspects, SuspicionResult examinedResult)
     {
         StringBuilder snapshot = new StringBuilder();
         for (SuspicionResult suspect : suspects)
@@ -45,6 +54,14 @@ final class PanelRefreshGate
                 snapshot.append('\n');
             }
             snapshot.append(suspect.stableEvidenceKey());
+        }
+        if (examinedResult != null)
+        {
+            if (snapshot.length() > 0)
+            {
+                snapshot.append('\n');
+            }
+            snapshot.append("examined|").append(examinedResult.stableEvidenceKey());
         }
         return snapshot.toString();
     }

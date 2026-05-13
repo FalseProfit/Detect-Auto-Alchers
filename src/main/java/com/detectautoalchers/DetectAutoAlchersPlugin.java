@@ -766,7 +766,8 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
 
         List<SuspicionResult> suspects = detectorService.getSuspiciousResults();
-        if (!panelRefreshGate.shouldRefresh(suspects, nowMillis, force))
+        SuspicionResult examinedResult = detectorService.getExaminedResult();
+        if (!panelRefreshGate.shouldRefresh(suspects, examinedResult, nowMillis, force))
         {
             return;
         }
@@ -777,7 +778,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             watchlistStore.getReportedPlayers(),
             overrideListStore.getReportedPlayers(),
             detectorService.getResultsByName(watchlistStore.getNormalizedNames()),
-            detectorService.getExaminedResult(),
+            examinedResult,
             config.compactPanelMode()
         );
     }

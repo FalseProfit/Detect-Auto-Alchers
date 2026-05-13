@@ -444,6 +444,72 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void examinedTrackedPlayerStaysInSyncWithSuspectResult()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("Live Examine", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        recordFiveAlchs(service, "Live Examine", now, config);
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, true));
+        service.recompute(config, now + 3_000L);
+
+        assertEquals(
+            name,
+            service.examinePlayer("Live Examine", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now + 3_500L)
+        );
+        service.recordAlchObservation("Live Examine", "animation", 713, 125, now + 3_600L, config);
+        service.recompute(config, now + 3_600L);
+
+        SuspicionResult suspectResult = service.getSuspiciousResults().get(0);
+        SuspicionResult examinedResult = service.getExaminedResult();
+
+        assertEquals(6, suspectResult.getCastCount());
+        assertEquals(6, examinedResult.getCastCount());
+        assertEquals(suspectResult.stableEvidenceKey(), examinedResult.stableEvidenceKey());
+    }
+
+    @Test
+    public void examinedHiscoreLookupForTrackedPlayerCountsOnce()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String name = service.updatePlayer("Tracked Lookup", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+
+        assertEquals(
+            name,
+            service.examinePlayer("Tracked Lookup", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now)
+        );
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(name, config, now));
+        assertEquals(1, service.getHiscoreLookupsInFlight());
+        assertFalse(service.markHiscoreLookupIfNeeded(name, config, now));
+
+        service.applyExaminedHiscore(name, HiscoreProfile.found(55, 1, true), config, now + 1_000L);
+
+        assertEquals(0, service.getHiscoreLookupsInFlight());
+        assertEquals("found", service.getResultsByName(Set.of(name)).get(name).getHiscoreStatus());
+    }
+
+    @Test
+    public void trackedExaminedHiscoreAppliesAfterExaminingDifferentPlayer()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = DetectorConfigSnapshot.defaultsForTesting();
+        long now = 10_000L;
+        String first = service.updatePlayer("First Tracked Lookup", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.examinePlayer("First Tracked Lookup", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now);
+        assertTrue(service.markExaminedHiscoreLookupIfNeeded(first, config, now));
+
+        service.examinePlayer("Second Examine", 301, 4, StaffClassifier.STAFF_OF_FIRE, config, now + 500L);
+        service.applyExaminedHiscore(first, HiscoreProfile.found(55, 1, true), config, now + 1_000L);
+
+        assertEquals(0, service.getHiscoreLookupsInFlight());
+        assertEquals("found", service.getResultsByName(Set.of(first)).get(first).getHiscoreStatus());
+        assertEquals("Second Examine", service.getExaminedResult().getDisplayName());
+    }
+
+    @Test
     public void suppressionReasonsDoNotClearEachOther()
     {
         DetectorService service = new DetectorService();

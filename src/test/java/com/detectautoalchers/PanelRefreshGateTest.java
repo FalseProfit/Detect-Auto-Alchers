@@ -44,6 +44,25 @@ public class PanelRefreshGateTest
     }
 
     @Test
+    public void changedExaminedStateRefreshesImmediately()
+    {
+        PanelRefreshGate gate = new PanelRefreshGate(5_000L);
+
+        assertTrue(gate.shouldRefresh(
+            Collections.emptyList(),
+            result("examined alcher", 120, DetectionConfidence.HIGH, 5),
+            10_000L,
+            false
+        ));
+        assertTrue(gate.shouldRefresh(
+            Collections.emptyList(),
+            result("examined alcher", 120, DetectionConfidence.HIGH, 6),
+            11_000L,
+            false
+        ));
+    }
+
+    @Test
     public void fallbackIntervalRefreshesUnchangedState()
     {
         PanelRefreshGate gate = new PanelRefreshGate(5_000L);

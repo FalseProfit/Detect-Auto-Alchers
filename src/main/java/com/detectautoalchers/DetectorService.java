@@ -306,16 +306,26 @@ final class DetectorService
             return "";
         }
 
-        PlayerEvidence existingEvidence = evidenceByName.get(normalizedName);
-        PlayerEvidence evidence = existingEvidence == null
-            ? new PlayerEvidence(normalizedName, displayName)
-            : existingEvidence.copy();
+        PlayerEvidence evidence = evidenceByName.get(normalizedName);
+        boolean trackedEvidence = evidence != null;
+        if (evidence == null && examinedEvidence != null && examinedEvidence.getNormalizedName().equals(normalizedName))
+        {
+            evidence = examinedEvidence;
+        }
+        if (evidence == null)
+        {
+            evidence = new PlayerEvidence(normalizedName, displayName);
+        }
         evidence.updateSeen(displayName, world, distance, weaponId, nowMillis);
         boolean examinedLookupInFlight = examinedHiscoreLookupMillisByName.containsKey(normalizedName);
-        evidence.setHiscoreLookupInFlight(examinedLookupInFlight);
         if (examinedLookupInFlight)
         {
+            evidence.setHiscoreLookupInFlight(true);
             evidence.setHiscoreProfile(HiscoreProfile.pending());
+        }
+        else if (!trackedEvidence)
+        {
+            evidence.setHiscoreLookupInFlight(false);
         }
         evidence.setLastResult(score(evidence, config, nowMillis));
         examinedEvidence = evidence;
@@ -325,12 +335,13 @@ final class DetectorService
     synchronized boolean markExaminedHiscoreLookupIfNeeded(String normalizedName, DetectorConfigSnapshot config, long nowMillis)
     {
         String normalized = normalizeName(normalizedName);
+        PlayerEvidence evidence = getExaminedEvidenceSource();
         if (!config.isEnableHiscoreScoring()
-            || examinedEvidence == null
-            || !examinedEvidence.getNormalizedName().equals(normalized)
-            || examinedEvidence.isHiscoreLookupInFlight()
+            || evidence == null
+            || !evidence.getNormalizedName().equals(normalized)
+            || evidence.isHiscoreLookupInFlight()
             || examinedHiscoreLookupMillisByName.containsKey(normalized)
-            || examinedEvidence.getHiscoreProfile().isTerminalSuccess())
+            || evidence.getHiscoreProfile().isTerminalSuccess())
         {
             return false;
         }
@@ -340,31 +351,33 @@ final class DetectorService
             return false;
         }
 
-        if (examinedEvidence.getLastHiscoreLookupMillis() > 0
-            && nowMillis - examinedEvidence.getLastHiscoreLookupMillis() < config.getHiscoreCooldownMillis())
+        if (evidence.getLastHiscoreLookupMillis() > 0
+            && nowMillis - evidence.getLastHiscoreLookupMillis() < config.getHiscoreCooldownMillis())
         {
             return false;
         }
 
-        examinedEvidence.setLastHiscoreLookupMillis(nowMillis);
-        examinedEvidence.setHiscoreLookupInFlight(true);
-        examinedEvidence.setHiscoreProfile(HiscoreProfile.pending());
-        examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
-        examinedHiscoreLookupMillisByName.put(examinedEvidence.getNormalizedName(), nowMillis);
+        evidence.setLastHiscoreLookupMillis(nowMillis);
+        evidence.setHiscoreLookupInFlight(true);
+        evidence.setHiscoreProfile(HiscoreProfile.pending());
+        evidence.setLastResult(score(evidence, config, nowMillis));
+        examinedEvidence = evidence;
+        examinedHiscoreLookupMillisByName.put(evidence.getNormalizedName(), nowMillis);
         return true;
     }
 
     synchronized int getHiscoreLookupsInFlight()
     {
-        int count = 0;
+        Set<String> normalizedNames = new HashSet<>();
         for (PlayerEvidence evidence : evidenceByName.values())
         {
             if (evidence.isHiscoreLookupInFlight())
             {
-                count++;
+                normalizedNames.add(evidence.getNormalizedName());
             }
         }
-        return count + examinedHiscoreLookupMillisByName.size();
+        normalizedNames.addAll(examinedHiscoreLookupMillisByName.keySet());
+        return normalizedNames.size();
     }
 
     synchronized boolean hasHiscoreLookupCapacity()
@@ -392,19 +405,29 @@ final class DetectorService
     {
         String normalized = normalizeName(normalizedName);
         examinedHiscoreLookupMillisByName.remove(normalized);
-        if (examinedEvidence == null || !examinedEvidence.getNormalizedName().equals(normalized))
+        PlayerEvidence evidence = evidenceByName.get(normalized);
+        if (evidence == null)
+        {
+            evidence = getExaminedEvidenceSource();
+        }
+        if (evidence == null || !evidence.getNormalizedName().equals(normalized))
         {
             return;
         }
 
-        examinedEvidence.setHiscoreLookupInFlight(false);
-        examinedEvidence.setHiscoreProfile(hiscoreProfile);
-        examinedEvidence.setLastResult(score(examinedEvidence, config, nowMillis));
+        evidence.setHiscoreLookupInFlight(false);
+        evidence.setHiscoreProfile(hiscoreProfile);
+        evidence.setLastResult(score(evidence, config, nowMillis));
+        if (examinedEvidence != null && examinedEvidence.getNormalizedName().equals(normalized))
+        {
+            examinedEvidence = evidence;
+        }
     }
 
     synchronized SuspicionResult getExaminedResult()
     {
-        return examinedEvidence == null ? null : examinedEvidence.getLastResult();
+        PlayerEvidence evidence = getExaminedEvidenceSource();
+        return evidence == null ? null : evidence.getLastResult();
     }
 
     synchronized List<SuspicionResult> getSuspiciousResults()
@@ -655,6 +678,23 @@ final class DetectorService
         return config.isIncludeFireRuneStaves()
             ? evidence.hasFireRuneProvider()
             : evidence.hasBasicFireStaff();
+    }
+
+    private PlayerEvidence getExaminedEvidenceSource()
+    {
+        if (examinedEvidence == null)
+        {
+            return null;
+        }
+
+        PlayerEvidence liveEvidence = evidenceByName.get(examinedEvidence.getNormalizedName());
+        if (liveEvidence != null)
+        {
+            examinedEvidence = liveEvidence;
+            return liveEvidence;
+        }
+
+        return examinedEvidence;
     }
 
     private void expireStaleHiscoreLookup(PlayerEvidence evidence, long nowMillis, long maxPendingMillis)
