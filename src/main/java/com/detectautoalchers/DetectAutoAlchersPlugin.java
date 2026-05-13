@@ -25,10 +25,8 @@ import javax.swing.SwingUtilities;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.Ignore;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
-import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
 import net.runelite.api.PlayerComposition;
 import net.runelite.api.WorldView;
@@ -271,11 +269,6 @@ public class DetectAutoAlchersPlugin extends Plugin
             detectorService.suppressName(actor.getName(), SuppressionReason.MOBILE);
             return;
         }
-        if (isIgnoredPlayer(actor.getName()))
-        {
-            detectorService.suppressName(actor.getName(), SuppressionReason.RUNELITE_IGNORE);
-            return;
-        }
 
         if (!snapshot.isAlchemyAnimation(actor.getAnimation()) || !isInRadius((Player) actor, snapshot.getRadius()))
         {
@@ -322,11 +315,6 @@ public class DetectAutoAlchersPlugin extends Plugin
                 continue;
             }
 
-            if (isIgnoredPlayer(player.getName()))
-            {
-                detectorService.suppressName(player.getName(), SuppressionReason.RUNELITE_IGNORE);
-                continue;
-            }
             if (isObservedMobilePlayer(player.getName(), snapshot))
             {
                 detectorService.suppressName(player.getName(), SuppressionReason.MOBILE);
@@ -346,7 +334,6 @@ public class DetectAutoAlchersPlugin extends Plugin
             requestHiscoreIfNeeded(player.getName(), normalizedName, snapshot, nowMillis);
         }
 
-        detectorService.syncSuppressionReason(getIgnoredNames(), SuppressionReason.RUNELITE_IGNORE);
         if (snapshot.isIgnoreMobilePlayers())
         {
             detectorService.suppressNames(mobilePlayerNames, SuppressionReason.MOBILE);
@@ -542,32 +529,6 @@ public class DetectAutoAlchersPlugin extends Plugin
     {
         PlayerComposition composition = player.getPlayerComposition();
         return composition == null ? -1 : composition.getEquipmentId(KitType.WEAPON);
-    }
-
-    private boolean isIgnoredPlayer(String name)
-    {
-        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
-        return ignoreContainer != null && ignoreContainer.findByName(name) != null;
-    }
-
-    private Set<String> getIgnoredNames()
-    {
-        Set<String> ignoredNames = new HashSet<>();
-        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
-        if (ignoreContainer == null)
-        {
-            return ignoredNames;
-        }
-
-        for (Ignore ignore : ignoreContainer.getMembers())
-        {
-            if (ignore != null)
-            {
-                ignoredNames.add(DetectorService.normalizeName(ignore.getName()));
-            }
-        }
-
-        return ignoredNames;
     }
 
     private void loadPlayerLists()

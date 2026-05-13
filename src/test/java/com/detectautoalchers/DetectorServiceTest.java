@@ -529,13 +529,13 @@ public class DetectorServiceTest
     {
         DetectorService service = new DetectorService();
 
-        service.suppressName("Ignored Alcher", SuppressionReason.RUNELITE_IGNORE);
+        service.suppressName("Mobile Alcher", SuppressionReason.MOBILE);
         service.suppressName("Reported Alcher", SuppressionReason.REPORTED);
-        service.syncSuppressionReason(Set.of("fresh ignored"), SuppressionReason.RUNELITE_IGNORE);
+        service.syncSuppressionReason(Set.of("fresh mobile"), SuppressionReason.MOBILE);
 
-        assertFalse(service.isSuppressed("Ignored Alcher"));
+        assertFalse(service.isSuppressed("Mobile Alcher"));
         assertTrue(service.isSuppressed("Reported Alcher"));
-        assertTrue(service.isSuppressed("Fresh Ignored"));
+        assertTrue(service.isSuppressed("Fresh Mobile"));
     }
 
     @Test

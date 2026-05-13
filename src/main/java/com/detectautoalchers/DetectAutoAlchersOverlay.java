@@ -8,8 +8,6 @@ import java.awt.Graphics2D;
 import java.awt.Shape;
 import javax.inject.Inject;
 import net.runelite.api.Client;
-import net.runelite.api.Ignore;
-import net.runelite.api.NameableContainer;
 import net.runelite.api.Player;
 import net.runelite.api.WorldView;
 import net.runelite.client.ui.overlay.Overlay;
@@ -65,7 +63,7 @@ final class DetectAutoAlchersOverlay extends Overlay
 
         for (Player player : worldView.players())
         {
-            if (player == null || player.getName() == null || isIgnoredPlayer(player.getName()))
+            if (player == null || player.getName() == null)
             {
                 continue;
             }
@@ -130,9 +128,4 @@ final class DetectAutoAlchersOverlay extends Overlay
         }
     }
 
-    private boolean isIgnoredPlayer(String name)
-    {
-        NameableContainer<Ignore> ignoreContainer = client.getIgnoreContainer();
-        return ignoreContainer != null && ignoreContainer.findByName(name) != null;
-    }
 }

@@ -4,6 +4,5 @@ enum SuppressionReason
 {
     REPORTED,
     MOBILE,
-    RUNELITE_IGNORE,
     OVERRIDE
 }
