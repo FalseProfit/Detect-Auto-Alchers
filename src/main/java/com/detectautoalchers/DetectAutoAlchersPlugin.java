@@ -364,13 +364,18 @@ public class DetectAutoAlchersPlugin extends Plugin
         DetectorConfigSnapshot snapshot = snapshot();
         if (config.rightClickExaminePlayers())
         {
-            addExamineMenuEntries(menuEntries);
+            addExamineMenuEntries(menuEntries, snapshot);
         }
         if (snapshot.isIgnoreMobilePlayers() && observeMobilePlayers(menuEntries))
         {
             refreshPanel(System.currentTimeMillis(), true);
         }
 
+        decorateMenuEntries(menuEntries, snapshot);
+    }
+
+    private void decorateMenuEntries(MenuEntry[] menuEntries, DetectorConfigSnapshot snapshot)
+    {
         if (config.showMenuDetectionScores())
         {
             MenuHighlighter.appendScores(
@@ -777,7 +782,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         );
     }
 
-    private void addExamineMenuEntries(MenuEntry[] menuEntries)
+    private void addExamineMenuEntries(MenuEntry[] menuEntries, DetectorConfigSnapshot snapshot)
     {
         if (menuEntries == null)
         {
@@ -807,11 +812,12 @@ public class DetectAutoAlchersPlugin extends Plugin
 
             Player player = entry.getPlayer();
             String target = entry.getTarget();
-            client.createMenuEntry(index + insertedEntries)
+            MenuEntry examineEntry = client.createMenuEntry(index + insertedEntries)
                 .setOption(EXAMINE_OPTION)
                 .setTarget(target == null || target.isEmpty() ? displayName : target)
                 .setType(MenuAction.RUNELITE_PLAYER)
                 .onClick(clicked -> examinePlayer(displayName, player));
+            decorateMenuEntries(new MenuEntry[]{examineEntry}, snapshot);
             insertedEntries++;
         }
     }

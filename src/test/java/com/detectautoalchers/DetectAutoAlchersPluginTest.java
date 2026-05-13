@@ -5,9 +5,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.awt.Color;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -16,6 +20,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.BooleanSupplier;
+import net.runelite.api.Client;
+import net.runelite.api.MenuEntry;
 import net.runelite.client.hiscore.HiscoreResult;
 import net.runelite.client.hiscore.HiscoreSkill;
 import net.runelite.client.hiscore.HiscoreSkillType;
@@ -24,6 +30,89 @@ import org.junit.Test;
 
 public class DetectAutoAlchersPluginTest
 {
+    @Test
+    public void examineMenuEntryUsesSuspiciousTargetColor() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        DetectorService detectorService = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 10);
+        long now = 10_000L;
+        String normalizedName = detectorService.updatePlayer("Auto Bot", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        for (int index = 0; index < 5; index++)
+        {
+            detectorService.recordAlchObservation(
+                "Auto Bot",
+                "animation",
+                713,
+                100 + (index * 5),
+                now + (index * 600L),
+                config
+            );
+        }
+        detectorService.applyHiscore(normalizedName, HiscoreProfile.found(55, 1, true));
+        detectorService.recompute(config, now + 3_000L);
+
+        List<MenuEntry> createdEntries = new ArrayList<>();
+        setField(plugin, "client", testClient(createdEntries));
+        setField(plugin, "config", menuDecorationConfig(false, true, new Color(144, 238, 144)));
+        setField(plugin, "detectorService", detectorService);
+        setField(
+            plugin,
+            "reportedPlayerStore",
+            new ReportedPlayerStore(Files.createTempDirectory("daa-test").resolve("reported.csv"))
+        );
+
+        MenuEntry report = testMenuEntry("Report", "<col=ffffff>Auto Bot<col=ff0000> (level-48)");
+        invokePrivate(
+            plugin,
+            "addExamineMenuEntries",
+            new Class<?>[]{MenuEntry[].class, DetectorConfigSnapshot.class},
+            new MenuEntry[]{report},
+            config
+        );
+
+        assertEquals(1, createdEntries.size());
+        assertEquals("Examine Alch Bot", createdEntries.get(0).getOption());
+        assertEquals(
+            MenuHighlighter.colorTarget("Auto Bot (level-48)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+            createdEntries.get(0).getTarget()
+        );
+    }
+
+    @Test
+    public void examineMenuEntryUsesReportedTargetColor() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        Color reportedColor = new Color(144, 238, 144);
+        ReportedPlayerStore reportedPlayerStore = new ReportedPlayerStore(
+            Files.createTempDirectory("daa-test").resolve("reported.csv")
+        );
+        reportedPlayerStore.record("reported bot", "Reported Bot", Instant.EPOCH);
+
+        List<MenuEntry> createdEntries = new ArrayList<>();
+        setField(plugin, "client", testClient(createdEntries));
+        setField(plugin, "config", menuDecorationConfig(false, true, reportedColor));
+        setField(plugin, "detectorService", new DetectorService());
+        setField(plugin, "reportedPlayerStore", reportedPlayerStore);
+
+        MenuEntry report = testMenuEntry("Report", "<col=ffffff>Reported Bot<col=ff0000> (level-48)");
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 60);
+        invokePrivate(
+            plugin,
+            "addExamineMenuEntries",
+            new Class<?>[]{MenuEntry[].class, DetectorConfigSnapshot.class},
+            new MenuEntry[]{report},
+            config
+        );
+
+        assertEquals(1, createdEntries.size());
+        assertEquals("Examine Alch Bot", createdEntries.get(0).getOption());
+        assertEquals(
+            MenuHighlighter.colorTarget("Reported Bot (level-48)", reportedColor),
+            createdEntries.get(0).getTarget()
+        );
+    }
+
     @Test
     public void clearingMobileSuppressionsRemovesOnlyMobileReason() throws Exception
     {
@@ -235,6 +324,125 @@ public class DetectAutoAlchersPluginTest
     {
         SuspicionResult result = result(detectorService, normalizedName);
         return result != null && status.equals(result.getHiscoreStatus());
+    }
+
+    private static Client testClient(List<MenuEntry> createdEntries)
+    {
+        return (Client) Proxy.newProxyInstance(
+            Client.class.getClassLoader(),
+            new Class<?>[]{Client.class},
+            (proxy, method, args) -> {
+                if ("createMenuEntry".equals(method.getName()))
+                {
+                    MenuEntry entry = testMenuEntry("", "");
+                    createdEntries.add(entry);
+                    return entry;
+                }
+                return defaultValue(method.getReturnType());
+            }
+        );
+    }
+
+    private static DetectAutoAlchersConfig menuDecorationConfig(
+        boolean showMenuDetectionScores,
+        boolean colorMenuEntries,
+        Color reportedColor)
+    {
+        return (DetectAutoAlchersConfig) Proxy.newProxyInstance(
+            DetectAutoAlchersConfig.class.getClassLoader(),
+            new Class<?>[]{DetectAutoAlchersConfig.class},
+            (proxy, method, args) -> {
+                switch (method.getName())
+                {
+                    case "showMenuDetectionScores":
+                        return showMenuDetectionScores;
+                    case "colorMenuEntries":
+                        return colorMenuEntries;
+                    case "reportedPlayerHighlightColor":
+                        return reportedColor;
+                    default:
+                        return defaultValue(method.getReturnType());
+                }
+            }
+        );
+    }
+
+    private static MenuEntry testMenuEntry(String option, String target)
+    {
+        String[] values = {option, target};
+        return (MenuEntry) Proxy.newProxyInstance(
+            MenuEntry.class.getClassLoader(),
+            new Class<?>[]{MenuEntry.class},
+            (proxy, method, args) -> {
+                switch (method.getName())
+                {
+                    case "getOption":
+                        return values[0];
+                    case "setOption":
+                        values[0] = (String) args[0];
+                        return proxy;
+                    case "getTarget":
+                        return values[1];
+                    case "setTarget":
+                        values[1] = (String) args[0];
+                        return proxy;
+                    case "getPlayer":
+                        return null;
+                    case "setType":
+                    case "onClick":
+                        return proxy;
+                    case "toString":
+                        return values[0] + " " + values[1];
+                    case "hashCode":
+                        return System.identityHashCode(proxy);
+                    case "equals":
+                        return proxy == args[0];
+                    default:
+                        return defaultValue(method.getReturnType());
+                }
+            }
+        );
+    }
+
+    private static Object defaultValue(Class<?> returnType)
+    {
+        if (!returnType.isPrimitive())
+        {
+            return null;
+        }
+        if (returnType == boolean.class)
+        {
+            return false;
+        }
+        if (returnType == void.class)
+        {
+            return null;
+        }
+        if (returnType == char.class)
+        {
+            return '\0';
+        }
+        if (returnType == long.class)
+        {
+            return 0L;
+        }
+        if (returnType == float.class)
+        {
+            return 0F;
+        }
+        if (returnType == double.class)
+        {
+            return 0D;
+        }
+        if (returnType == byte.class)
+        {
+            return (byte) 0;
+        }
+        if (returnType == short.class)
+        {
+            return (short) 0;
+        }
+        return 0;
     }
 
     private static void waitUntil(BooleanSupplier condition) throws InterruptedException
