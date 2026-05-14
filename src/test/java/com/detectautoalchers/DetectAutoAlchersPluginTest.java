@@ -72,7 +72,7 @@ public class DetectAutoAlchersPluginTest
         );
 
         assertEquals(1, createdEntries.size());
-        assertEquals("Examine Alch Bot", createdEntries.get(0).getOption());
+        assertEquals("Inspect Alch Activity", createdEntries.get(0).getOption());
         assertEquals(
             MenuHighlighter.colorTarget("Auto Bot (level-48)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             createdEntries.get(0).getTarget()
@@ -106,7 +106,7 @@ public class DetectAutoAlchersPluginTest
         );
 
         assertEquals(1, createdEntries.size());
-        assertEquals("Examine Alch Bot", createdEntries.get(0).getOption());
+        assertEquals("Inspect Alch Activity", createdEntries.get(0).getOption());
         assertEquals(
             MenuHighlighter.colorTarget("Reported Bot (level-48)", reportedColor),
             createdEntries.get(0).getTarget()

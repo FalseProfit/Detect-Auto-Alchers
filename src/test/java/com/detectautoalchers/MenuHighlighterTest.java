@@ -137,7 +137,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Alch Bot Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Activity Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -156,7 +156,7 @@ public class MenuHighlighterTest
         );
 
         assertEquals("<col=ffffff>Username<col=ff0000> (level-98)", follow.getTarget());
-        assertTrue(report.getTarget().contains("Alch Bot Score: 120"));
+        assertTrue(report.getTarget().contains("Alch Activity Score: 120"));
     }
 
     @Test
@@ -167,7 +167,7 @@ public class MenuHighlighterTest
         MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.emptyMap(), 80, 110);
 
         assertEquals(
-            "<col=ffffff>Unknown Player<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Alch Bot Score: 0)", Color.WHITE),
+            "<col=ffffff>Unknown Player<col=ff0000> (level-98) " + MenuHighlighter.colorText("(Alch Activity Score: 0)", Color.WHITE),
             entry.getTarget()
         );
     }
@@ -182,7 +182,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Alch Bot Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
+                + MenuHighlighter.colorText("(Alch Activity Score: 120)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
                 + "<img=23>",
             entry.getTarget()
         );
@@ -198,7 +198,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Alch Bot Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Activity Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -215,7 +215,25 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Alch Bot Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Activity Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
+            entry.getTarget()
+        );
+    }
+
+    @Test
+    public void replacesPreviousBotScoreLabelWithoutDuplicating()
+    {
+        MenuEntry entry = testMenuEntry(
+            "Report",
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Alch Bot Score: 120)", Color.WHITE)
+        );
+
+        MenuHighlighter.appendScores(new MenuEntry[]{entry}, Collections.singletonMap("username", 140), 80, 110);
+
+        assertEquals(
+            "<col=ffffff>Username<col=ff0000> (level-98) "
+                + MenuHighlighter.colorText("(Alch Activity Score: 140)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -229,7 +247,7 @@ public class MenuHighlighterTest
 
         assertEquals(
             "<col=ffffff>Username<col=ff0000> (level-98) "
-                + MenuHighlighter.colorText("(Alch Bot Score: 80)", MenuHighlighter.MODERATE_CONFIDENCE_HIGHLIGHT_COLOR),
+                + MenuHighlighter.colorText("(Alch Activity Score: 80)", MenuHighlighter.MODERATE_CONFIDENCE_HIGHLIGHT_COLOR),
             entry.getTarget()
         );
     }
@@ -248,7 +266,7 @@ public class MenuHighlighterTest
         assertEquals(
             MenuHighlighter.colorText("Username (level-98)", MenuHighlighter.HIGH_CONFIDENCE_HIGHLIGHT_COLOR)
                 + " "
-                + MenuHighlighter.colorText("(Alch Bot Score: 0)", Color.WHITE),
+                + MenuHighlighter.colorText("(Alch Activity Score: 0)", Color.WHITE),
             entry.getTarget()
         );
     }

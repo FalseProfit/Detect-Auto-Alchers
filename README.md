@@ -23,7 +23,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 
 - The scene overlay outlines high-confidence suspects in red and moderate-confidence suspects in yellow.
 - The plugin side panel lists current suspects, confidence, score, casts, hiscore evidence, reductions, and time since last seen.
-- When right-click Examine is enabled, the player menu includes an Examine Alch Bot option that shows the latest manually examined player score in a separate side-panel section without changing detection, watchlist, override, reported, ignore, or mobile suppression state.
+- When right-click inspect is enabled, the player menu includes an Inspect Alch Activity option that shows the latest manually examined player score in a separate side-panel section without changing detection, watchlist, override, reported, or mobile suppression state.
 - The debug menu-score setting adds each right-clicked player's current detection score to the Report option.
 - The side panel can be switched to compact mode for shorter suspect rows.
 - Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
@@ -34,7 +34,6 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - The side panel includes a visual watchlist. Watched players can be outlined and shown in the panel when seen, but watchlist entries do not change detection score or confidence.
 - The side panel includes an Override list. Override-listed players are suppressed from suspect highlighting until removed from the list.
 - The side panel includes one-shot Conservative, Balanced, and Aggressive preset buttons. Presets write selected detection/scoring settings once; they do not create managed profiles.
-- Players on the RuneLite ignore list are suppressed.
 - Mobile-client players can be suppressed after their mobile icon is observed in the right-click menu.
 
 The plugin never submits reports automatically.
@@ -54,13 +53,14 @@ The plugin never submits reports automatically.
 - Alchemy spot-animation IDs: `112,113`
 - Scene overlay: enabled
 - Menu coloring: enabled
-- Menu sorting by confidence: enabled
+- Menu sorting by confidence: disabled
+- Right-click inspect players: disabled
 - Persistent reported-player history: enabled
 - Reported-player highlighting: enabled
 - Reported-player highlight color: RGB `144,238,144`
 - Compact panel mode: disabled
 - Hiscore scoring: enabled
-- Minimum Magic threshold: Magic level 53. Set to 21 to include Low Alchemy bots.
+- Minimum Magic threshold: Magic level 53. Set to 21 to include Low Alchemy capable accounts.
 - Other-skill threshold: level 50
 - Allowed other skills above threshold: 2
 - High-Magic scoring: enabled at Magic level 99
@@ -110,12 +110,3 @@ Then run:
 ```
 
 The `run` task starts RuneLite in developer mode with this external plugin loaded.
-
-Two helper scripts are available for local sideload testing:
-
-```sh
-scripts/install-sideloaded-plugin.zsh
-scripts/run-sideloaded-runelite.zsh
-```
-
-`install-sideloaded-plugin.zsh` runs tests, builds the plugin jar, and copies it to `~/.runelite/sideloaded-plugins`. `run-sideloaded-runelite.zsh` launches a locally installed RuneLite client from `~/.runelite/repository2` in developer mode.

@@ -5,4 +5,3 @@ build/
 *.class
 *.log
 .DS_Store
-scripts/

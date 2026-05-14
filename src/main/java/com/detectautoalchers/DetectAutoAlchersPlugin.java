@@ -63,7 +63,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private static final String CONFIG_GROUP = "detectautoalchers";
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
-    private static final String EXAMINE_OPTION = "Examine Alch Bot";
+    private static final String EXAMINE_OPTION = "Inspect Alch Activity";
     private static final long PANEL_REFRESH_INTERVAL_MILLIS = 5_000L;
     private static final long HISCORE_LOOKUP_TIMEOUT_MILLIS = 10_000L;
     private static final long HISCORE_LOOKUP_RETRY_DELAY_MILLIS = 1_500L;

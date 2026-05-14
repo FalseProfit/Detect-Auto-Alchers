@@ -18,8 +18,8 @@ final class MenuHighlighter
     static final Color HIGH_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 64, 64);
     static final Color MODERATE_CONFIDENCE_HIGHLIGHT_COLOR = new Color(255, 220, 64);
     private static final Color LOW_SCORE_COLOR = Color.WHITE;
-    private static final String SCORE_LABEL = "Alch Bot Score";
-    private static final String SCORE_LABEL_PATTERN = "(?:alch\\s+bot\\s+score|score)";
+    private static final String SCORE_LABEL = "Alch Activity Score";
+    private static final String SCORE_LABEL_PATTERN = "(?:alch\\s+(?:activity|bot)\\s+score|score)";
     private static final Pattern LEVEL_SUFFIX_WITH_TRAILING_ICON = Pattern.compile(
         "(?i).*\\(level-\\d+\\)\\s*(?:\\(" + SCORE_LABEL_PATTERN + ":\\s*\\d+\\)\\s*)?(?:<img=\\d+>\\s*)+$"
     );

@@ -218,25 +218,25 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "sortMenuEntriesByConfidence",
         name = "Sort menu entries",
-        description = "Sort right-click player menu entries by detection confidence: high first, then moderate, then unflagged. Default: on.",
+        description = "Sort right-click player menu entries by detection confidence: high first, then moderate, then unflagged. Default: off.",
         position = 13,
         section = basicSection
     )
     default boolean sortMenuEntriesByConfidence()
     {
-        return true;
+        return false;
     }
 
     @ConfigItem(
         keyName = "rightClickExaminePlayers",
-        name = "Right-click 'Examine' Players",
-        description = "Add an Examine Alch Bot option below Report in player right-click menus. Default: on.",
+        name = "Right-click inspect players",
+        description = "Add an Inspect Alch Activity option below Report in player right-click menus. Default: off.",
         position = 14,
         section = basicSection
     )
     default boolean rightClickExaminePlayers()
     {
-        return true;
+        return false;
     }
 
     @ConfigItem(
@@ -314,7 +314,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "magicLevelThreshold",
         name = "Magic threshold",
-        description = "Minimum Magic level required before a target player can receive detection score. Default: 53. Set to 21 to include Low Alchemy bots.",
+        description = "Minimum Magic level required before a target player can receive detection score. Default: 53. Set to 21 to include Low Alchemy accounts.",
         position = 1,
         section = scoreIncreasesSection
     )
@@ -327,7 +327,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "nonMagicSkillThreshold",
         name = "Other skill threshold",
-        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls what level of non-Magic skills can be ignored when calculating the Magic-dominant account rule and subsequent detection score.<br>How many skills ignored is configurable below. Default: 50.",
+        description = "Some automated alching accounts increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls what level of non-Magic skills can be ignored when calculating the Magic-dominant account rule and subsequent detection score.<br>How many skills ignored is configurable below. Default: 50.",
         position = 2,
         section = scoreIncreasesSection
     )
@@ -340,7 +340,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "allowedNonMagicSkillsAboveThreshold",
         name = "Allowed other skills",
-        description = "Some smart alch bots increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule.<br>Skill level configured above. Default: 2 skills.",
+        description = "Some automated alching accounts increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule.<br>Skill level configured above. Default: 2 skills.",
         position = 3,
         section = scoreIncreasesSection
     )
@@ -353,7 +353,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "enableMaxMagicScoring",
         name = "99 Magic scoring",
-        description = "Add extra score for accounts still alching at 99 Magic. Why would real players alch past 99? Default: on.",
+        description = "Add extra score for accounts still observed alching at 99 Magic. Default: on.",
         position = 4,
         section = scoreIncreasesSection
     )
@@ -365,7 +365,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "maxMagicScore",
         name = "High Magic score",
-        description = "Detection score added for accounts at 99 Magic. Why would real players alch past 99? High likelihood of botting. Default: +100.",
+        description = "Detection score added for accounts observed alching at 99 Magic. Default: +100.",
         position = 5,
         section = scoreIncreasesSection
     )
@@ -378,7 +378,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "enableMatureAccountSuppression",
         name = "Non-Magic total reduction",
-        description = "Subtract bot score from accounts with enough non-Magic total level to look less like a fresh alching account. Default: on.",
+        description = "Subtract detection score from accounts with enough non-Magic total level to look less like a fresh alching account. Default: on.",
         position = 0,
         section = scoreReductionsSection
     )
