@@ -347,6 +347,29 @@ public class DetectorServiceTest
     }
 
     @Test
+    public void zeroCastThresholdStillScoresObservedAlchemyBehavior()
+    {
+        DetectorService service = new DetectorService();
+        DetectorConfigSnapshot config = configWithCastAndModerateThreshold(0, 60);
+        long now = 10_000L;
+
+        String name = service.updatePlayer("Casting Score Bot", 301, 4, StaffClassifier.STAFF_OF_FIRE, now);
+        service.recordAlchObservation("Casting Score Bot", "animation", 713, 100, now, config);
+        service.applyHiscore(name, HiscoreProfile.found(55, 1, true));
+
+        service.recompute(config, now + 3_000L);
+        List<SuspicionResult> suspects = service.getSuspiciousResults();
+
+        assertEquals(1, suspects.size());
+        assertEquals("Casting Score Bot", suspects.get(0).getDisplayName());
+        assertEquals(110, suspects.get(0).getScore());
+        assertEquals(1, suspects.get(0).getCastCount());
+        assertTrue(suspects.get(0).isBehaviorMatch());
+        assertTrue(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("casts +50"));
+        assertFalse(suspects.get(0).getScoreBreakdown().getScoreLabels().contains("cadence +10"));
+    }
+
+    @Test
     public void positiveCastThresholdStillRequiresAlchemyBehavior()
     {
         DetectorService service = new DetectorService();

@@ -548,7 +548,7 @@ final class DetectorService
         boolean staffMatch = staffMatches(evidence, config);
         int castThreshold = config.getCastThreshold();
         boolean castGateDisabled = castThreshold == 0;
-        boolean behaviorMatch = castThreshold > 0 && castCount >= castThreshold;
+        boolean behaviorMatch = castGateDisabled ? castCount > 0 : castCount >= castThreshold;
         HiscoreProfile hiscoreProfile = evidence.getHiscoreProfile();
         boolean belowMagicThreshold = config.isEnableHiscoreScoring()
             && hiscoreProfile.isBelowMagicLevel(config.getMagicLevelThreshold());
@@ -563,7 +563,7 @@ final class DetectorService
             && !belowMagicThreshold
             && config.isEnableMaxMagicScoring()
             && hiscoreProfile.isAtLeastMagicLevel(DetectorConfigSnapshot.HIGH_MAGIC_LEVEL);
-        boolean consistentCadence = behaviorMatch && evidence.hasConsistentCadence(
+        boolean consistentCadence = !castGateDisabled && behaviorMatch && evidence.hasConsistentCadence(
             nowMillis,
             config.getObservationWindowMillis(),
             castThreshold
