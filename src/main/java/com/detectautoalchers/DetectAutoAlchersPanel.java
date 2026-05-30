@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +37,10 @@ final class DetectAutoAlchersPanel extends PluginPanel
         void override(String normalizedName, String displayName);
 
         void removeWatch(String normalizedName);
+
+        void removeReportedWatchlist();
+
+        void removeBannedWatchlist();
 
         void removeOverride(String normalizedName);
 
@@ -303,6 +308,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addButton(buttons, "Watch", () -> actions.watch(suspect.getNormalizedName(), suspect.getDisplayName()));
         addButton(buttons, "Override", () -> actions.override(suspect.getNormalizedName(), suspect.getDisplayName()));
         buttons.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+        buttons.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, buttons.getPreferredSize().height));
         row.add(buttons);
     }
 
@@ -362,6 +368,11 @@ final class DetectAutoAlchersPanel extends PluginPanel
         boolean watchlist)
     {
         addSection(content, title);
+        if (watchlist)
+        {
+            addWatchlistCleanupButtons();
+        }
+
         if (players.isEmpty())
         {
             addMuted("No players.");
@@ -399,6 +410,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
                     addButton(buttons, "Remove", () -> actions.removeOverride(player.getNormalizedName()));
                 }
                 buttons.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+                buttons.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, buttons.getPreferredSize().height));
                 row.add(buttons);
             }
 
@@ -406,6 +418,28 @@ final class DetectAutoAlchersPanel extends PluginPanel
             content.add(row);
             content.add(Box.createRigidArea(new Dimension(0, 6)));
         }
+    }
+
+    private void addWatchlistCleanupButtons()
+    {
+        if (actions == null)
+        {
+            return;
+        }
+
+        JPanel row = new JPanel();
+        row.setLayout(new GridLayout(1, 2, 4, 0));
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        addButton(row, twoLineButtonText("Remove", "Reported"), actions::removeReportedWatchlist);
+        addButton(row, twoLineButtonText("Remove", "Banned"), actions::removeBannedWatchlist);
+        addButtonRow(row);
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+    }
+
+    private String twoLineButtonText(String firstLine, String secondLine)
+    {
+        return "<html><center>" + firstLine + "<br>" + secondLine + "</center></html>";
     }
 
     private void addDetail(JPanel panel, String text)

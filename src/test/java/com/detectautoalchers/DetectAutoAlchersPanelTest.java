@@ -134,6 +134,36 @@ public class DetectAutoAlchersPanelTest
     }
 
     @Test
+    public void showsWatchlistCleanupButtonsBeforeWatchedPlayers()
+        throws InvocationTargetException, InterruptedException
+    {
+        DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
+        ReportedPlayer watched = new ReportedPlayer("watched bot", "Watched Bot", Instant.EPOCH);
+
+        SwingUtilities.invokeAndWait(() -> panel.refresh(
+            Collections.emptyList(),
+            2_000L,
+            List.of(watched),
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            null,
+            false
+        ));
+
+        assertTrue(containsButton(panel, "Remove Reported"));
+        assertTrue(containsButton(panel, "Remove Banned"));
+        assertTrue(maxButtonRowWidth(panel) <= 220);
+        assertEquals(buttonFontSize(panel, "Conservative"), buttonFontSize(panel, "Remove Reported"), 0.0F);
+        assertTrue(buttonPreferredHeight(panel, "Remove Reported") > buttonPreferredHeight(panel, "Conservative"));
+        assertTrue(rawButtonText(panel, "Remove Reported").contains("<br>"));
+
+        List<String> texts = componentTexts(panel);
+        assertTrue(texts.indexOf("Watchlist") < texts.indexOf("Remove Reported"));
+        assertTrue(texts.indexOf("Remove Reported") < texts.indexOf("Remove Banned"));
+        assertTrue(texts.indexOf("Remove Banned") < texts.indexOf("Watched Bot"));
+    }
+
+    @Test
     public void topControlRowsFitPanelWidth() throws InvocationTargetException, InterruptedException
     {
         DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
@@ -269,6 +299,13 @@ public class DetectAutoAlchersPanelTest
         return labels;
     }
 
+    private List<String> componentTexts(Component component)
+    {
+        List<String> texts = new ArrayList<>();
+        collectComponentTexts(component, texts);
+        return texts;
+    }
+
     private void collectLabelTexts(Component component, List<String> labels)
     {
         if (component instanceof JLabel)
@@ -294,6 +331,41 @@ public class DetectAutoAlchersPanelTest
             for (Component child : ((JPanel) component).getComponents())
             {
                 collectLabelTexts(child, labels);
+            }
+        }
+    }
+
+    private void collectComponentTexts(Component component, List<String> texts)
+    {
+        if (component instanceof JLabel)
+        {
+            texts.add(((JLabel) component).getText());
+            return;
+        }
+
+        if (component instanceof JButton)
+        {
+            texts.add(normalizedButtonText((JButton) component));
+            return;
+        }
+
+        if (component instanceof JScrollPane)
+        {
+            collectComponentTexts(((JScrollPane) component).getViewport(), texts);
+            return;
+        }
+
+        if (component instanceof JViewport)
+        {
+            collectComponentTexts(((JViewport) component).getView(), texts);
+            return;
+        }
+
+        if (component instanceof JPanel)
+        {
+            for (Component child : ((JPanel) component).getComponents())
+            {
+                collectComponentTexts(child, texts);
             }
         }
     }
@@ -328,7 +400,7 @@ public class DetectAutoAlchersPanelTest
 
     private boolean containsButton(Component component, String text)
     {
-        if (component instanceof JButton && text.equals(((JButton) component).getText()))
+        if (component instanceof JButton && text.equals(normalizedButtonText((JButton) component)))
         {
             return true;
         }
@@ -351,6 +423,61 @@ public class DetectAutoAlchersPanelTest
             }
         }
         return false;
+    }
+
+    private float buttonFontSize(Component component, String text)
+    {
+        JButton button = findButton(component, text);
+        return button == null ? -1F : button.getFont().getSize2D();
+    }
+
+    private int buttonPreferredHeight(Component component, String text)
+    {
+        JButton button = findButton(component, text);
+        return button == null ? -1 : button.getPreferredSize().height;
+    }
+
+    private String rawButtonText(Component component, String text)
+    {
+        JButton button = findButton(component, text);
+        return button == null ? "" : button.getText();
+    }
+
+    private JButton findButton(Component component, String text)
+    {
+        if (component instanceof JButton && text.equals(normalizedButtonText((JButton) component)))
+        {
+            return (JButton) component;
+        }
+        if (component instanceof JScrollPane)
+        {
+            return findButton(((JScrollPane) component).getViewport(), text);
+        }
+        if (component instanceof JViewport)
+        {
+            return findButton(((JViewport) component).getView(), text);
+        }
+        if (component instanceof JPanel)
+        {
+            for (Component child : ((JPanel) component).getComponents())
+            {
+                JButton button = findButton(child, text);
+                if (button != null)
+                {
+                    return button;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String normalizedButtonText(JButton button)
+    {
+        return button.getText()
+            .replaceAll("(?i)<br\\s*/?>", " ")
+            .replaceAll("<[^>]+>", "")
+            .replaceAll("\\s+", " ")
+            .trim();
     }
 
     private static final class NoopActions implements DetectAutoAlchersPanel.Actions
@@ -382,6 +509,16 @@ public class DetectAutoAlchersPanelTest
 
         @Override
         public void removeWatch(String normalizedName)
+        {
+        }
+
+        @Override
+        public void removeReportedWatchlist()
+        {
+        }
+
+        @Override
+        public void removeBannedWatchlist()
         {
         }
 

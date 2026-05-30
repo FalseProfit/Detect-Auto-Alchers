@@ -146,4 +146,53 @@ public class ReportedPlayerStoreTest
         assertTrue(store.contains("Keep Bot"));
         assertFalse(store.contains("Remove Bot"));
     }
+
+    @Test
+    public void removesMultipleEntriesAndPersistsCsv() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("keep bot", "Keep Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("remove one", "Remove One", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("remove two", "Remove Two", Instant.parse("2026-04-26T14:35:22Z"));
+
+        int removed = store.removeAll(List.of("Remove One", "remove two", "missing bot"));
+
+        assertEquals(2, removed);
+        assertTrue(store.contains("Keep Bot"));
+        assertFalse(store.contains("Remove One"));
+        assertFalse(store.contains("Remove Two"));
+
+        String csv = Files.readString(path, StandardCharsets.UTF_8);
+        assertTrue(csv.contains("keep bot,Keep Bot,2026-04-26T14:35:22Z"));
+        assertFalse(csv.contains("remove one"));
+        assertFalse(csv.contains("remove two"));
+    }
+
+    @Test
+    public void watchlistStoreWritesDateWatchedHeader() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("watchlist.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path, "date_watched");
+
+        store.record("watched bot", "Watched Bot", Instant.parse("2026-04-26T14:35:22Z"));
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals("normalized_name,display_name,date_watched", lines.get(0));
+        assertTrue(lines.get(1).contains("watched bot,Watched Bot,2026-04-26T14:35:22Z"));
+    }
+
+    @Test
+    public void overrideStoreWritesDateAllowlistedHeader() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("override-list.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path, "date_allowlisted");
+
+        store.record("allowed player", "Allowed Player", Instant.parse("2026-04-26T14:35:22Z"));
+
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        assertEquals("normalized_name,display_name,date_allowlisted", lines.get(0));
+        assertTrue(lines.get(1).contains("allowed player,Allowed Player,2026-04-26T14:35:22Z"));
+    }
 }
