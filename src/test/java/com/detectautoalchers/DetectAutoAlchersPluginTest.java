@@ -19,8 +19,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import net.runelite.api.Client;
@@ -313,6 +315,85 @@ public class DetectAutoAlchersPluginTest
         assertEquals(1, plugin.lookupCount);
     }
 
+    @Test
+    public void removeBannedWatchlistUpdatesProgressUntilCompletion() throws Exception
+    {
+        ScriptedLookupPlugin plugin = new ScriptedLookupPlugin();
+        ReportedPlayerStore watchlistStore = new ReportedPlayerStore(
+            Files.createTempDirectory("daa-test").resolve("watchlist.csv")
+        );
+
+        watchlistStore.record("found bot", "Found Bot", Instant.EPOCH);
+        watchlistStore.record("error bot", "Error Bot", Instant.EPOCH);
+        watchlistStore.record("gone bot", "Gone Bot", Instant.EPOCH);
+        setField(plugin, "watchlistStore", watchlistStore);
+
+        invokePrivate(plugin, "removeBannedWatchlist", new Class<?>[0]);
+        waitUntil(() -> cleanupStatus(plugin, "found bot") == WatchlistCleanupProgress.Status.CHECKING);
+
+        WatchlistCleanupProgress progress = watchlistCleanupProgress(plugin);
+        assertEquals(3, progress.getTotal());
+        assertEquals(0, progress.getChecked());
+        assertEquals("Found Bot", progress.getCurrentDisplayName());
+        assertEquals(WatchlistCleanupProgress.Status.PENDING, cleanupStatus(plugin, "error bot"));
+
+        plugin.futures.get(0).complete(hiscoreResult(55));
+        waitUntil(() -> plugin.lookupCount == 2
+            && cleanupStatus(plugin, "found bot") == WatchlistCleanupProgress.Status.FOUND
+            && cleanupStatus(plugin, "error bot") == WatchlistCleanupProgress.Status.CHECKING);
+
+        progress = watchlistCleanupProgress(plugin);
+        assertEquals(1, progress.getChecked());
+        assertEquals("Error Bot", progress.getCurrentDisplayName());
+
+        plugin.futures.get(1).completeExceptionally(new RuntimeException("lookup failed"));
+        waitUntil(() -> plugin.lookupCount == 3
+            && cleanupStatus(plugin, "error bot") == WatchlistCleanupProgress.Status.ERROR
+            && cleanupStatus(plugin, "gone bot") == WatchlistCleanupProgress.Status.CHECKING);
+
+        CountDownLatch releaseFinish = new CountDownLatch(1);
+        CountDownLatch finishBlocked = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.execute(() ->
+        {
+            finishBlocked.countDown();
+            try
+            {
+                releaseFinish.await(2, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException ex)
+            {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertTrue(finishBlocked.await(1, TimeUnit.SECONDS));
+        setField(plugin, "ioExecutor", executor);
+
+        try
+        {
+            plugin.futures.get(2).complete(null);
+            waitUntil(() -> cleanupStatus(plugin, "gone bot") == WatchlistCleanupProgress.Status.NOT_FOUND);
+
+            progress = watchlistCleanupProgress(plugin);
+            assertEquals(3, progress.getChecked());
+            assertEquals("", progress.getCurrentDisplayName());
+            assertTrue(watchlistStore.contains("Gone Bot"));
+
+            releaseFinish.countDown();
+            waitUntil(() -> !watchlistCleanupInFlight(plugin));
+
+            assertTrue(watchlistCleanupProgress(plugin) == null);
+            assertTrue(watchlistStore.contains("Found Bot"));
+            assertTrue(watchlistStore.contains("Error Bot"));
+            assertFalse(watchlistStore.contains("Gone Bot"));
+        }
+        finally
+        {
+            releaseFinish.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private static void requestHiscoreIfNeeded(
         DetectAutoAlchersPlugin plugin,
         String displayName,
@@ -426,6 +507,26 @@ public class DetectAutoAlchersPluginTest
         {
             throw new AssertionError(ex);
         }
+    }
+
+    private static WatchlistCleanupProgress watchlistCleanupProgress(DetectAutoAlchersPlugin plugin)
+    {
+        try
+        {
+            Field field = DetectAutoAlchersPlugin.class.getDeclaredField("watchlistCleanupProgress");
+            field.setAccessible(true);
+            return (WatchlistCleanupProgress) field.get(plugin);
+        }
+        catch (ReflectiveOperationException ex)
+        {
+            throw new AssertionError(ex);
+        }
+    }
+
+    private static WatchlistCleanupProgress.Status cleanupStatus(DetectAutoAlchersPlugin plugin, String normalizedName)
+    {
+        WatchlistCleanupProgress progress = watchlistCleanupProgress(plugin);
+        return progress == null ? null : progress.getStatus(normalizedName);
     }
 
     private static Client testClient(List<MenuEntry> createdEntries)

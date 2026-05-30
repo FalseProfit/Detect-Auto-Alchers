@@ -164,6 +164,68 @@ public class DetectAutoAlchersPanelTest
     }
 
     @Test
+    public void showsWatchlistCleanupProgress()
+        throws InvocationTargetException, InterruptedException
+    {
+        DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
+        List<ReportedPlayer> watched = List.of(
+            new ReportedPlayer("pending bot", "Pending Bot", Instant.EPOCH),
+            new ReportedPlayer("checking bot", "Checking Bot", Instant.EPOCH),
+            new ReportedPlayer("found bot", "Found Bot", Instant.EPOCH),
+            new ReportedPlayer("gone bot", "Gone Bot", Instant.EPOCH),
+            new ReportedPlayer("error bot", "Error Bot", Instant.EPOCH)
+        );
+        WatchlistCleanupProgress progress = WatchlistCleanupProgress.start(watched)
+            .withStatus("checking bot", WatchlistCleanupProgress.Status.CHECKING)
+            .withStatus("found bot", WatchlistCleanupProgress.Status.FOUND)
+            .withStatus("gone bot", WatchlistCleanupProgress.Status.NOT_FOUND)
+            .withStatus("error bot", WatchlistCleanupProgress.Status.ERROR);
+
+        SwingUtilities.invokeAndWait(() -> panel.refresh(
+            Collections.emptyList(),
+            2_000L,
+            watched,
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            null,
+            false,
+            progress
+        ));
+
+        assertTrue(containsLabel(panel, "Remove Banned: 3/5 checked, 2 remaining"));
+        assertTrue(containsLabel(panel, "checking: Checking Bot"));
+        assertTrue(containsLabel(panel, ". pending"));
+        assertTrue(containsLabel(panel, "> checking hiscores"));
+        assertTrue(containsLabel(panel, "+ found; keeping"));
+        assertTrue(containsLabel(panel, "- not found; removing"));
+        assertTrue(containsLabel(panel, "! lookup failed; keeping"));
+        assertFalse(isButtonEnabled(panel, "Remove Banned"));
+    }
+
+    @Test
+    public void hidesWatchlistCleanupProgressWhenIdle()
+        throws InvocationTargetException, InterruptedException
+    {
+        DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
+        ReportedPlayer watched = new ReportedPlayer("watched bot", "Watched Bot", Instant.EPOCH);
+
+        SwingUtilities.invokeAndWait(() -> panel.refresh(
+            Collections.emptyList(),
+            2_000L,
+            List.of(watched),
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            null,
+            false
+        ));
+
+        assertFalse(containsLabel(panel, "Remove Banned:"));
+        assertFalse(containsLabel(panel, ". pending"));
+        assertFalse(containsLabel(panel, "> checking hiscores"));
+        assertTrue(isButtonEnabled(panel, "Remove Banned"));
+    }
+
+    @Test
     public void topControlRowsFitPanelWidth() throws InvocationTargetException, InterruptedException
     {
         DetectAutoAlchersPanel panel = new DetectAutoAlchersPanel(new NoopActions());
@@ -441,6 +503,12 @@ public class DetectAutoAlchersPanelTest
     {
         JButton button = findButton(component, text);
         return button == null ? "" : button.getText();
+    }
+
+    private boolean isButtonEnabled(Component component, String text)
+    {
+        JButton button = findButton(component, text);
+        return button != null && button.isEnabled();
     }
 
     private JButton findButton(Component component, String text)

@@ -118,6 +118,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private final Set<String> mobilePlayerNames = new HashSet<>();
     private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
     private final AtomicBoolean watchlistHiscoreCleanupInFlight = new AtomicBoolean();
+    private volatile WatchlistCleanupProgress watchlistCleanupProgress;
 
     @Provides
     DetectAutoAlchersConfig provideConfig(ConfigManager configManager)
@@ -192,6 +193,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
         panel = null;
         configSnapshot = null;
+        watchlistCleanupProgress = null;
         panelRefreshGate.reset();
         mobilePlayerNames.clear();
         detectorService.clear();
@@ -744,7 +746,8 @@ public class DetectAutoAlchersPlugin extends Plugin
             overrideListStore.getReportedPlayers(),
             detectorService.getResultsByName(watchlistStore.getNormalizedNames()),
             examinedResult,
-            config.compactPanelMode()
+            config.compactPanelMode(),
+            watchlistCleanupProgress
         );
     }
 
@@ -966,10 +969,12 @@ public class DetectAutoAlchersPlugin extends Plugin
                 if (watchedPlayers.isEmpty())
                 {
                     watchlistHiscoreCleanupInFlight.set(false);
+                    watchlistCleanupProgress = null;
                     refreshPanel(System.currentTimeMillis(), true);
                     return;
                 }
 
+                updateWatchlistCleanupProgress(WatchlistCleanupProgress.start(watchedPlayers));
                 findHiscoreNotFoundWatchlistNames(watchedPlayers)
                     .whenComplete((normalizedNames, throwable) ->
                     {
@@ -986,6 +991,7 @@ public class DetectAutoAlchersPlugin extends Plugin
             catch (RuntimeException ex)
             {
                 watchlistHiscoreCleanupInFlight.set(false);
+                watchlistCleanupProgress = null;
                 log.warn("Unable to start watchlist hiscore cleanup", ex);
                 refreshPanel(System.currentTimeMillis(), true);
             }
@@ -998,24 +1004,58 @@ public class DetectAutoAlchersPlugin extends Plugin
         for (ReportedPlayer player : watchedPlayers)
         {
             future = future.thenCompose(normalizedNames ->
-                lookupHiscoreWithRetry(player.getDisplayName())
+            {
+                updateWatchlistCleanupProgress(player.getNormalizedName(), WatchlistCleanupProgress.Status.CHECKING);
+                return lookupHiscoreWithRetry(player.getDisplayName())
                     .handle((result, throwable) ->
                     {
                         if (throwable != null)
                         {
                             log.debug("Hiscore cleanup lookup failed for {}", player.getDisplayName(), throwable);
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.ERROR
+                            );
                             return normalizedNames;
                         }
 
                         if (result == null)
                         {
                             normalizedNames.add(player.getNormalizedName());
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.NOT_FOUND
+                            );
+                        }
+                        else
+                        {
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.FOUND
+                            );
                         }
                         return normalizedNames;
-                    })
-            );
+                    });
+            });
         }
         return future;
+    }
+
+    private void updateWatchlistCleanupProgress(WatchlistCleanupProgress progress)
+    {
+        watchlistCleanupProgress = progress;
+        refreshPanel(System.currentTimeMillis(), true);
+    }
+
+    private void updateWatchlistCleanupProgress(String normalizedName, WatchlistCleanupProgress.Status status)
+    {
+        WatchlistCleanupProgress progress = watchlistCleanupProgress;
+        if (progress == null)
+        {
+            return;
+        }
+
+        updateWatchlistCleanupProgress(progress.withStatus(normalizedName, status));
     }
 
     private void finishBannedWatchlistCleanup(Set<String> normalizedNames)
@@ -1028,7 +1068,6 @@ public class DetectAutoAlchersPlugin extends Plugin
                 {
                     watchlistStore.removeAll(normalizedNames);
                 }
-                refreshPanel(System.currentTimeMillis(), true);
             }
             catch (IOException ex)
             {
@@ -1037,6 +1076,8 @@ public class DetectAutoAlchersPlugin extends Plugin
             finally
             {
                 watchlistHiscoreCleanupInFlight.set(false);
+                watchlistCleanupProgress = null;
+                refreshPanel(System.currentTimeMillis(), true);
             }
         });
     }
