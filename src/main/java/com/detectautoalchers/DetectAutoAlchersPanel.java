@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +37,10 @@ final class DetectAutoAlchersPanel extends PluginPanel
         void override(String normalizedName, String displayName);
 
         void removeWatch(String normalizedName);
+
+        void removeReportedWatchlist();
+
+        void removeBannedWatchlist();
 
         void removeOverride(String normalizedName);
 
@@ -82,7 +87,15 @@ final class DetectAutoAlchersPanel extends PluginPanel
 
     void refresh(List<SuspicionResult> suspects, long nowMillis)
     {
-        refresh(suspects, nowMillis, Collections.emptyList(), Collections.emptyList(), Collections.emptyMap(), null, false);
+        refresh(
+            suspects,
+            nowMillis,
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyMap(),
+            null,
+            false
+        );
     }
 
     void refresh(
@@ -94,6 +107,19 @@ final class DetectAutoAlchersPanel extends PluginPanel
         SuspicionResult examinedResult,
         boolean compact)
     {
+        refresh(suspects, nowMillis, watchedPlayers, overridePlayers, watchedResults, examinedResult, compact, null);
+    }
+
+    void refresh(
+        List<SuspicionResult> suspects,
+        long nowMillis,
+        Collection<ReportedPlayer> watchedPlayers,
+        Collection<ReportedPlayer> overridePlayers,
+        Map<String, SuspicionResult> watchedResults,
+        SuspicionResult examinedResult,
+        boolean compact,
+        WatchlistCleanupProgress watchlistCleanupProgress)
+    {
         if (!SwingUtilities.isEventDispatchThread())
         {
             SwingUtilities.invokeLater(() -> refresh(
@@ -103,7 +129,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
                 overridePlayers,
                 watchedResults,
                 examinedResult,
-                compact
+                compact,
+                watchlistCleanupProgress
             ));
             return;
         }
@@ -127,8 +154,8 @@ final class DetectAutoAlchersPanel extends PluginPanel
             }
         }
 
-        addPlayerList("Watchlist", watchedPlayers, watchedResults, nowMillis, true);
-        addPlayerList("Override list", overridePlayers, Collections.emptyMap(), nowMillis, false);
+        addPlayerList("Watchlist", watchedPlayers, watchedResults, nowMillis, true, watchlistCleanupProgress);
+        addPlayerList("Override list", overridePlayers, Collections.emptyMap(), nowMillis, false, null);
 
         content.revalidate();
         content.repaint();
@@ -207,11 +234,12 @@ final class DetectAutoAlchersPanel extends PluginPanel
         content.add(row);
     }
 
-    private void addButton(JPanel row, String text, Runnable callback)
+    private JButton addButton(JPanel row, String text, Runnable callback)
     {
         JButton button = new JButton(text);
         button.addActionListener(event -> callback.run());
         row.add(button);
+        return button;
     }
 
     private void addMuted(String text)
@@ -303,6 +331,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
         addButton(buttons, "Watch", () -> actions.watch(suspect.getNormalizedName(), suspect.getDisplayName()));
         addButton(buttons, "Override", () -> actions.override(suspect.getNormalizedName(), suspect.getDisplayName()));
         buttons.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+        buttons.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, buttons.getPreferredSize().height));
         row.add(buttons);
     }
 
@@ -359,9 +388,16 @@ final class DetectAutoAlchersPanel extends PluginPanel
         Collection<ReportedPlayer> players,
         Map<String, SuspicionResult> currentResults,
         long nowMillis,
-        boolean watchlist)
+        boolean watchlist,
+        WatchlistCleanupProgress watchlistCleanupProgress)
     {
         addSection(content, title);
+        if (watchlist)
+        {
+            addWatchlistCleanupButtons(watchlistCleanupProgress);
+            addWatchlistCleanupProgress(watchlistCleanupProgress);
+        }
+
         if (players.isEmpty())
         {
             addMuted("No players.");
@@ -387,6 +423,11 @@ final class DetectAutoAlchersPanel extends PluginPanel
                 addDetail(row, "not currently seen");
             }
 
+            if (watchlist)
+            {
+                addWatchlistCleanupStatus(row, player, watchlistCleanupProgress);
+            }
+
             if (actions != null)
             {
                 JPanel buttons = buttonRow();
@@ -399,6 +440,7 @@ final class DetectAutoAlchersPanel extends PluginPanel
                     addButton(buttons, "Remove", () -> actions.removeOverride(player.getNormalizedName()));
                 }
                 buttons.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+                buttons.setMaximumSize(new Dimension(PANEL_CONTENT_WIDTH, buttons.getPreferredSize().height));
                 row.add(buttons);
             }
 
@@ -406,6 +448,93 @@ final class DetectAutoAlchersPanel extends PluginPanel
             content.add(row);
             content.add(Box.createRigidArea(new Dimension(0, 6)));
         }
+    }
+
+    private void addWatchlistCleanupButtons(WatchlistCleanupProgress watchlistCleanupProgress)
+    {
+        if (actions == null)
+        {
+            return;
+        }
+
+        JPanel row = new JPanel();
+        row.setLayout(new GridLayout(1, 2, 4, 0));
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        addButton(row, twoLineButtonText("Remove", "Reported"), actions::removeReportedWatchlist);
+        JButton removeBanned = addButton(row, twoLineButtonText("Remove", "Banned"), actions::removeBannedWatchlist);
+        removeBanned.setEnabled(!isWatchlistCleanupActive(watchlistCleanupProgress));
+        addButtonRow(row);
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+    }
+
+    private void addWatchlistCleanupProgress(WatchlistCleanupProgress progress)
+    {
+        if (!isWatchlistCleanupActive(progress))
+        {
+            return;
+        }
+
+        addMuted("Remove Banned: "
+            + progress.getChecked()
+            + "/"
+            + progress.getTotal()
+            + " checked, "
+            + progress.getRemaining()
+            + " remaining");
+        String currentDisplayName = progress.getCurrentDisplayName();
+        if (!currentDisplayName.isEmpty())
+        {
+            addMuted("checking: " + currentDisplayName);
+        }
+        content.add(Box.createRigidArea(new Dimension(0, 4)));
+    }
+
+    private void addWatchlistCleanupStatus(
+        JPanel row,
+        ReportedPlayer player,
+        WatchlistCleanupProgress progress)
+    {
+        if (!isWatchlistCleanupActive(progress))
+        {
+            return;
+        }
+
+        WatchlistCleanupProgress.Status status = progress.getStatus(player.getNormalizedName());
+        if (status == null)
+        {
+            return;
+        }
+
+        addDetail(row, cleanupStatusLabel(status));
+    }
+
+    private boolean isWatchlistCleanupActive(WatchlistCleanupProgress progress)
+    {
+        return progress != null && progress.isActive();
+    }
+
+    private String cleanupStatusLabel(WatchlistCleanupProgress.Status status)
+    {
+        switch (status)
+        {
+            case CHECKING:
+                return "> checking hiscores";
+            case FOUND:
+                return "+ found; keeping";
+            case NOT_FOUND:
+                return "- not found; removing";
+            case ERROR:
+                return "! lookup failed; keeping";
+            case PENDING:
+            default:
+                return ". pending";
+        }
+    }
+
+    private String twoLineButtonText(String firstLine, String secondLine)
+    {
+        return "<html><center>" + firstLine + "<br>" + secondLine + "</center></html>";
     }
 
     private void addDetail(JPanel panel, String text)

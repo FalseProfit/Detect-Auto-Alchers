@@ -10,13 +10,16 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.JFileChooser;
@@ -114,6 +117,8 @@ public class DetectAutoAlchersPlugin extends Plugin
     private DetectorConfigSnapshot configSnapshot;
     private final Set<String> mobilePlayerNames = new HashSet<>();
     private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
+    private final AtomicBoolean watchlistHiscoreCleanupInFlight = new AtomicBoolean();
+    private volatile WatchlistCleanupProgress watchlistCleanupProgress;
 
     @Provides
     DetectAutoAlchersConfig provideConfig(ConfigManager configManager)
@@ -188,6 +193,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
         panel = null;
         configSnapshot = null;
+        watchlistCleanupProgress = null;
         panelRefreshGate.reset();
         mobilePlayerNames.clear();
         detectorService.clear();
@@ -740,7 +746,8 @@ public class DetectAutoAlchersPlugin extends Plugin
             overrideListStore.getReportedPlayers(),
             detectorService.getResultsByName(watchlistStore.getNormalizedNames()),
             examinedResult,
-            config.compactPanelMode()
+            config.compactPanelMode(),
+            watchlistCleanupProgress
         );
     }
 
@@ -931,6 +938,150 @@ public class DetectAutoAlchersPlugin extends Plugin
         });
     }
 
+    private void removeReportedWatchlist()
+    {
+        runIo(() ->
+        {
+            try
+            {
+                watchlistStore.removeAll(reportedPlayerStore.getNormalizedNames());
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to remove reported players from watchlist at {}", watchlistStore.getPath(), ex);
+            }
+        });
+    }
+
+    private void removeBannedWatchlist()
+    {
+        if (!watchlistHiscoreCleanupInFlight.compareAndSet(false, true))
+        {
+            return;
+        }
+
+        runIo(() ->
+        {
+            try
+            {
+                List<ReportedPlayer> watchedPlayers = new ArrayList<>(watchlistStore.getReportedPlayers());
+                if (watchedPlayers.isEmpty())
+                {
+                    watchlistHiscoreCleanupInFlight.set(false);
+                    watchlistCleanupProgress = null;
+                    refreshPanel(System.currentTimeMillis(), true);
+                    return;
+                }
+
+                updateWatchlistCleanupProgress(WatchlistCleanupProgress.start(watchedPlayers));
+                findHiscoreNotFoundWatchlistNames(watchedPlayers)
+                    .whenComplete((normalizedNames, throwable) ->
+                    {
+                        if (throwable != null)
+                        {
+                            log.warn("Unable to complete watchlist hiscore cleanup", throwable);
+                            finishBannedWatchlistCleanup(Set.of());
+                            return;
+                        }
+
+                        finishBannedWatchlistCleanup(normalizedNames);
+                    });
+            }
+            catch (RuntimeException ex)
+            {
+                watchlistHiscoreCleanupInFlight.set(false);
+                watchlistCleanupProgress = null;
+                log.warn("Unable to start watchlist hiscore cleanup", ex);
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+        });
+    }
+
+    private CompletableFuture<Set<String>> findHiscoreNotFoundWatchlistNames(List<ReportedPlayer> watchedPlayers)
+    {
+        CompletableFuture<Set<String>> future = CompletableFuture.completedFuture(new LinkedHashSet<String>());
+        for (ReportedPlayer player : watchedPlayers)
+        {
+            future = future.thenCompose(normalizedNames ->
+            {
+                updateWatchlistCleanupProgress(player.getNormalizedName(), WatchlistCleanupProgress.Status.CHECKING);
+                return lookupHiscoreWithRetry(player.getDisplayName())
+                    .handle((result, throwable) ->
+                    {
+                        if (throwable != null)
+                        {
+                            log.debug("Hiscore cleanup lookup failed for {}", player.getDisplayName(), throwable);
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.ERROR
+                            );
+                            return normalizedNames;
+                        }
+
+                        if (result == null)
+                        {
+                            normalizedNames.add(player.getNormalizedName());
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.NOT_FOUND
+                            );
+                        }
+                        else
+                        {
+                            updateWatchlistCleanupProgress(
+                                player.getNormalizedName(),
+                                WatchlistCleanupProgress.Status.FOUND
+                            );
+                        }
+                        return normalizedNames;
+                    });
+            });
+        }
+        return future;
+    }
+
+    private void updateWatchlistCleanupProgress(WatchlistCleanupProgress progress)
+    {
+        watchlistCleanupProgress = progress;
+        refreshPanel(System.currentTimeMillis(), true);
+    }
+
+    private void updateWatchlistCleanupProgress(String normalizedName, WatchlistCleanupProgress.Status status)
+    {
+        WatchlistCleanupProgress progress = watchlistCleanupProgress;
+        if (progress == null)
+        {
+            return;
+        }
+
+        updateWatchlistCleanupProgress(progress.withStatus(normalizedName, status));
+    }
+
+    private void finishBannedWatchlistCleanup(Set<String> normalizedNames)
+    {
+        runIo(() ->
+        {
+            try
+            {
+                if (!normalizedNames.isEmpty())
+                {
+                    watchlistStore.removeAll(normalizedNames);
+                }
+            }
+            catch (IOException ex)
+            {
+                log.warn("Unable to remove hiscore-not-found players from watchlist at {}", watchlistStore.getPath(), ex);
+            }
+            finally
+            {
+                watchlistHiscoreCleanupInFlight.set(false);
+                watchlistCleanupProgress = null;
+                refreshPanel(System.currentTimeMillis(), true);
+            }
+        });
+    }
+
     private void importReportedHistory()
     {
         Path path = chooseFile("Import reported history", JFileChooser.OPEN_DIALOG);
@@ -1093,6 +1244,18 @@ public class DetectAutoAlchersPlugin extends Plugin
         public void removeWatch(String normalizedName)
         {
             removeListEntry(watchlistStore, normalizedName, null);
+        }
+
+        @Override
+        public void removeReportedWatchlist()
+        {
+            DetectAutoAlchersPlugin.this.removeReportedWatchlist();
+        }
+
+        @Override
+        public void removeBannedWatchlist()
+        {
+            DetectAutoAlchersPlugin.this.removeBannedWatchlist();
         }
 
         @Override

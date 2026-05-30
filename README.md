@@ -32,6 +32,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Previously reported players can be outlined and menu-colored with a separate configurable reported-player color.
 - The side panel can import, export, and clear local reported-player history.
 - The side panel includes a visual watchlist. Watched players can be outlined and shown in the panel when seen, but watchlist entries do not change detection score or confidence.
+- The watchlist can remove entries already present in reported-player history, or entries whose normal OSRS hiscore lookup returns not found. The hiscore cleanup is a heuristic and is not proof of a ban, because renamed or missing-name accounts can also fail name-based lookup.
 - The side panel includes an Override list. Override-listed players are suppressed from suspect highlighting until removed from the list.
 - The side panel includes one-shot Conservative, Balanced, and Aggressive preset buttons. Presets write selected detection/scoring settings once; they do not create managed profiles.
 - Mobile-client players can be suppressed after their mobile icon is observed in the right-click menu.
@@ -88,7 +89,7 @@ Reported players are saved locally at:
 ~/.runelite/detect-auto-alchers/override-list.csv
 ```
 
-Each CSV stores `normalized_name`, `display_name`, and `date_reported`. Reported players and Override list players are suppressed from future suspect highlighting. Watchlist players are visual only.
+The reported-player CSV stores `normalized_name`, `display_name`, and `date_reported`. The watchlist CSV stores `normalized_name`, `display_name`, and `date_watched`. The Override list CSV stores `normalized_name`, `display_name`, and `date_allowlisted`. Reported players and Override list players are suppressed from future suspect highlighting. Watchlist players are visual only.
 
 Preset buttons apply these intent-level profiles:
 

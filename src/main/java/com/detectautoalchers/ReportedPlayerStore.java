@@ -20,44 +20,56 @@ import net.runelite.client.RuneLite;
 
 final class ReportedPlayerStore
 {
-    private static final String HEADER = "normalized_name,display_name,date_reported";
+    private static final String DATE_REPORTED_COLUMN = "date_reported";
+    private static final String DATE_WATCHED_COLUMN = "date_watched";
+    private static final String DATE_ALLOWLISTED_COLUMN = "date_allowlisted";
     private static final String DIRECTORY = "detect-auto-alchers";
     private static final String REPORTED_FILE_NAME = "reported-players.csv";
     private static final String WATCHLIST_FILE_NAME = "watchlist.csv";
     private static final String OVERRIDE_LIST_FILE_NAME = "override-list.csv";
 
     private final Path path;
+    private final String dateColumnName;
     private final Map<String, ReportedPlayer> reportedPlayers = new LinkedHashMap<>();
 
     ReportedPlayerStore(Path path)
     {
+        this(path, DATE_REPORTED_COLUMN);
+    }
+
+    ReportedPlayerStore(Path path, String dateColumnName)
+    {
         this.path = path;
+        this.dateColumnName = dateColumnName;
     }
 
     static ReportedPlayerStore createDefault()
     {
-        return create(REPORTED_FILE_NAME);
+        return create(REPORTED_FILE_NAME, DATE_REPORTED_COLUMN);
     }
 
     static ReportedPlayerStore createWatchlist()
     {
-        return create(WATCHLIST_FILE_NAME);
+        return create(WATCHLIST_FILE_NAME, DATE_WATCHED_COLUMN);
     }
 
     static ReportedPlayerStore createOverrideList()
     {
-        return create(OVERRIDE_LIST_FILE_NAME);
+        return create(OVERRIDE_LIST_FILE_NAME, DATE_ALLOWLISTED_COLUMN);
     }
 
-    private static ReportedPlayerStore create(String fileName)
+    private static ReportedPlayerStore create(String fileName, String dateColumnName)
     {
-        return new ReportedPlayerStore(RuneLite.RUNELITE_DIR.toPath().resolve(DIRECTORY).resolve(fileName));
+        return new ReportedPlayerStore(
+            RuneLite.RUNELITE_DIR.toPath().resolve(DIRECTORY).resolve(fileName),
+            dateColumnName
+        );
     }
 
     synchronized void load() throws IOException
     {
         reportedPlayers.clear();
-        reportedPlayers.putAll(read(path));
+        reportedPlayers.putAll(read(path, dateColumnName));
     }
 
     synchronized void record(String normalizedName, String displayName, Instant dateReported) throws IOException
@@ -79,6 +91,25 @@ final class ReportedPlayerStore
         save();
     }
 
+    synchronized int removeAll(Collection<String> normalizedNames) throws IOException
+    {
+        int removed = 0;
+        for (String normalizedName : normalizedNames)
+        {
+            String normalized = DetectorService.normalizeName(normalizedName);
+            if (!normalized.isEmpty() && reportedPlayers.remove(normalized) != null)
+            {
+                removed++;
+            }
+        }
+
+        if (removed > 0)
+        {
+            save();
+        }
+        return removed;
+    }
+
     synchronized void clear() throws IOException
     {
         reportedPlayers.clear();
@@ -87,12 +118,12 @@ final class ReportedPlayerStore
 
     synchronized void exportTo(Path exportPath) throws IOException
     {
-        saveTo(exportPath, reportedPlayers.values());
+        saveTo(exportPath, reportedPlayers.values(), dateColumnName);
     }
 
     synchronized void importFrom(Path importPath, ImportMode mode) throws IOException
     {
-        Map<String, ReportedPlayer> importedPlayers = read(importPath);
+        Map<String, ReportedPlayer> importedPlayers = read(importPath, dateColumnName);
         if (mode == ImportMode.REPLACE)
         {
             reportedPlayers.clear();
@@ -124,10 +155,10 @@ final class ReportedPlayerStore
 
     private void save() throws IOException
     {
-        saveTo(path, reportedPlayers.values());
+        saveTo(path, reportedPlayers.values(), dateColumnName);
     }
 
-    private static Map<String, ReportedPlayer> read(Path source) throws IOException
+    private static Map<String, ReportedPlayer> read(Path source, String dateColumnName) throws IOException
     {
         Map<String, ReportedPlayer> players = new LinkedHashMap<>();
         if (!Files.exists(source))
@@ -139,11 +170,6 @@ final class ReportedPlayerStore
         for (int i = 0; i < lines.size(); i++)
         {
             String line = lines.get(i);
-            if (i == 0 && HEADER.equals(line))
-            {
-                continue;
-            }
-
             if (line.trim().isEmpty())
             {
                 continue;
@@ -151,6 +177,10 @@ final class ReportedPlayerStore
 
             List<String> values = parseCsvLine(line);
             if (values.size() != 3)
+            {
+                continue;
+            }
+            if (i == 0 && isHeader(values, dateColumnName))
             {
                 continue;
             }
@@ -168,7 +198,15 @@ final class ReportedPlayerStore
         return players;
     }
 
-    private static void saveTo(Path destination, Collection<ReportedPlayer> players) throws IOException
+    private static boolean isHeader(List<String> values, String dateColumnName)
+    {
+        return "normalized_name".equals(values.get(0))
+            && "display_name".equals(values.get(1))
+            && dateColumnName.equals(values.get(2));
+    }
+
+    private static void saveTo(Path destination, Collection<ReportedPlayer> players, String dateColumnName)
+        throws IOException
     {
         Path parent = destination.getParent();
         if (parent != null)
@@ -177,7 +215,7 @@ final class ReportedPlayerStore
         }
 
         List<String> lines = new ArrayList<>();
-        lines.add(HEADER);
+        lines.add("normalized_name,display_name," + dateColumnName);
         for (ReportedPlayer reportedPlayer : players)
         {
             lines.add(csv(reportedPlayer.getNormalizedName())
