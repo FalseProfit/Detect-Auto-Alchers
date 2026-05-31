@@ -4,11 +4,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -120,6 +122,45 @@ public class ReportedPlayerStoreTest
     }
 
     @Test
+    public void skipsImportedSpreadsheetFormulaNames() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path importPath = temporaryFolder.newFolder().toPath().resolve("import.csv");
+        Files.write(importPath, List.of(
+            "normalized_name,display_name,date_reported",
+            "safe bot,Safe Bot,2026-04-27T14:35:22Z",
+            "=1+1,Formula Normalized,2026-04-27T14:35:22Z",
+            "formula display,=1+1,2026-04-27T14:35:22Z",
+            "spaced formula,\" @SUM(1,1)\",2026-04-27T14:35:22Z"
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.importFrom(importPath, ImportMode.MERGE);
+
+        assertTrue(store.contains("Safe Bot"));
+        assertFalse(store.contains("=1+1"));
+        assertFalse(store.contains("formula display"));
+        assertFalse(store.contains("spaced formula"));
+        assertEquals(1, store.getNormalizedNames().size());
+    }
+
+    @Test
+    public void recordSkipsSpreadsheetFormulaNames() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("safe bot", "Safe Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("=1+1", "Formula Normalized", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("formula display", "=1+1", Instant.parse("2026-04-26T14:35:22Z"));
+
+        assertTrue(store.contains("Safe Bot"));
+        assertFalse(store.contains("=1+1"));
+        assertFalse(store.contains("formula display"));
+        assertEquals(1, store.getNormalizedNames().size());
+    }
+
+    @Test
     public void exportsReportedPlayers() throws Exception
     {
         Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
@@ -131,6 +172,23 @@ public class ReportedPlayerStoreTest
 
         String csv = Files.readString(exportPath, StandardCharsets.UTF_8);
         assertTrue(csv.contains("export bot,Export Bot,2026-04-26T14:35:22Z"));
+    }
+
+    @Test
+    public void exportNeutralizesSpreadsheetFormulaValues() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path exportPath = temporaryFolder.newFolder().toPath().resolve("export.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+        mutablePlayers(store).put(
+            "formula bot",
+            new ReportedPlayer("formula bot", "=1+1", Instant.parse("2026-04-26T14:35:22Z"))
+        );
+
+        store.exportTo(exportPath);
+
+        String csv = Files.readString(exportPath, StandardCharsets.UTF_8);
+        assertTrue(csv.contains("formula bot,'=1+1,2026-04-26T14:35:22Z"));
     }
 
     @Test
@@ -194,5 +252,13 @@ public class ReportedPlayerStoreTest
         List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
         assertEquals("normalized_name,display_name,date_allowlisted", lines.get(0));
         assertTrue(lines.get(1).contains("allowed player,Allowed Player,2026-04-26T14:35:22Z"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, ReportedPlayer> mutablePlayers(ReportedPlayerStore store) throws Exception
+    {
+        Field field = ReportedPlayerStore.class.getDeclaredField("reportedPlayers");
+        field.setAccessible(true);
+        return (Map<String, ReportedPlayer>) field.get(store);
     }
 }

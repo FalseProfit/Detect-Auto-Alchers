@@ -81,6 +81,11 @@ final class ReportedPlayerStore
         }
 
         String display = displayName == null || displayName.trim().isEmpty() ? normalized : displayName.trim();
+        if (hasSpreadsheetFormulaPrefix(normalized) || hasSpreadsheetFormulaPrefix(display))
+        {
+            return;
+        }
+
         reportedPlayers.put(normalized, new ReportedPlayer(normalized, display, dateReported));
         save();
     }
@@ -192,6 +197,13 @@ final class ReportedPlayerStore
             }
 
             String displayName = values.get(1).trim().isEmpty() ? normalizedName : values.get(1).trim();
+            if (hasSpreadsheetFormulaPrefix(values.get(0))
+                || hasSpreadsheetFormulaPrefix(normalizedName)
+                || hasSpreadsheetFormulaPrefix(displayName))
+            {
+                continue;
+            }
+
             Instant dateReported = parseInstant(values.get(2));
             players.put(normalizedName, new ReportedPlayer(normalizedName, displayName, dateReported));
         }
@@ -237,7 +249,7 @@ final class ReportedPlayerStore
 
     private static String csv(String value)
     {
-        String safe = value == null ? "" : value;
+        String safe = neutralizeSpreadsheetFormula(value == null ? "" : value);
         boolean quote = safe.indexOf(',') >= 0
             || safe.indexOf('"') >= 0
             || safe.indexOf('\n') >= 0
@@ -248,6 +260,41 @@ final class ReportedPlayerStore
         }
 
         return "\"" + safe.replace("\"", "\"\"") + "\"";
+    }
+
+    private static String neutralizeSpreadsheetFormula(String value)
+    {
+        if (hasSpreadsheetFormulaPrefix(value))
+        {
+            return "'" + value;
+        }
+        return value;
+    }
+
+    private static boolean hasSpreadsheetFormulaPrefix(String value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+
+        char firstRaw = value.isEmpty() ? '\0' : value.charAt(0);
+        if (firstRaw == '\t' || firstRaw == '\r' || firstRaw == '\n')
+        {
+            return true;
+        }
+
+        String trimmed = value.trim();
+        if (trimmed.isEmpty())
+        {
+            return false;
+        }
+
+        char first = trimmed.charAt(0);
+        return first == '='
+            || first == '+'
+            || first == '-'
+            || first == '@';
     }
 
     private static List<String> parseCsvLine(String line)
