@@ -46,9 +46,9 @@ The plugin never submits reports automatically.
 
 - Detection radius: 15 tiles
 - Observation window: 60 seconds
-- Cast threshold: 5 observations. Set to `0` to allow fire-staff hiscore lookups and score-only detection without requiring recent casts.
-- Moderate confidence threshold: 80
-- High confidence margin: +30, for an effective high confidence threshold of 110
+- Cast threshold: 10 observations. Set to `0` to allow fire-staff hiscore lookups and score-only detection without requiring recent casts.
+- Moderate confidence threshold: 90
+- High confidence margin: +30, for an effective high confidence threshold of 120
 - Require fire staff: enabled
 - Broad fire-rune staff matching: disabled
 - Ignore mobile players: enabled
@@ -66,13 +66,13 @@ The plugin never submits reports automatically.
 - Hiscore scoring: enabled
 - Minimum Magic threshold: Magic level 53. Set to 21 to include Low Alchemy capable accounts.
 - Other-skill threshold: level 50
-- Allowed other skills above threshold: 2
+- Allowed other skills above threshold: 1
 - High-Magic scoring: enabled at Magic level 99
 - High-Magic score: +100
 - Non-Magic total reduction: enabled
 - Non-Magic total reduction threshold: 150
-- Non-Magic total reduction penalty: -100
-- Clue/collection-log reduction threshold: at least 4 combined entries
+- Non-Magic total reduction penalty: -150
+- Clue/collection-log reduction threshold: at least 1 combined entry
 - Clue/collection-log reduction penalty: -100
 
 Built-in score values:
@@ -96,8 +96,8 @@ The reported-player CSV stores `normalized_name`, `display_name`, and `date_repo
 
 Preset buttons apply these intent-level profiles:
 
-- Conservative: stricter cast and score thresholds, narrow staff matching, and stronger played-account reductions.
-- Balanced: current default detection/scoring settings.
+- Conservative: current default detection/scoring settings, with stricter cast and score thresholds, narrow staff matching, and stronger played-account reductions.
+- Balanced: middle-ground detection/scoring settings.
 - Aggressive: lower cast and score thresholds, broad fire-rune staff matching, Magic threshold 21, and lighter played-account reductions.
 
 ## Development

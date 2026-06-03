@@ -39,6 +39,40 @@ public class DetectionPresetTest
         assertEquals(250, DetectionPreset.AGGRESSIVE.getNonMagicTotalLevelSuppressionThreshold());
     }
 
+    @Test
+    public void defaultConfigMatchesConservativePreset()
+    {
+        DetectAutoAlchersConfig config = new DetectAutoAlchersConfig()
+        {
+        };
+        DetectorConfigSnapshot snapshot = DetectorConfigSnapshot.from(config);
+        DetectionPreset preset = DetectionPreset.CONSERVATIVE;
+
+        assertEquals(preset.getCastThreshold(), snapshot.getCastThreshold());
+        assertEquals(preset.getSuspicionThreshold(), snapshot.getSuspicionThreshold());
+        assertEquals(preset.getHighConfidenceMargin(), config.highConfidenceMargin());
+        assertEquals(highConfidenceThreshold(preset), snapshot.getHighConfidenceThreshold());
+        assertEquals(highConfidenceThreshold(preset), config.highConfidenceThreshold());
+        assertEquals(preset.isRequireFireStaff(), snapshot.isRequireFireStaff());
+        assertEquals(preset.isIncludeFireRuneStaves(), snapshot.isIncludeFireRuneStaves());
+        assertEquals(preset.getMagicLevelThreshold(), snapshot.getMagicLevelThreshold());
+        assertEquals(preset.getNonMagicSkillThreshold(), snapshot.getNonMagicSkillThreshold());
+        assertEquals(
+            preset.getAllowedNonMagicSkillsAboveThreshold(),
+            snapshot.getAllowedNonMagicSkillsAboveThreshold()
+        );
+        assertEquals(
+            preset.getNonMagicTotalLevelSuppressionThreshold(),
+            snapshot.getNonMagicTotalLevelSuppressionThreshold()
+        );
+        assertEquals(preset.getMatureAccountScorePenalty(), snapshot.getMatureAccountScorePenalty());
+        assertEquals(preset.getClueCollectionActivityThreshold(), snapshot.getClueCollectionActivityThreshold());
+        assertEquals(
+            preset.getClueCollectionActivityScorePenalty(),
+            snapshot.getClueCollectionActivityScorePenalty()
+        );
+    }
+
     private int highConfidenceThreshold(DetectionPreset preset)
     {
         return preset.getSuspicionThreshold() + preset.getHighConfidenceMargin();

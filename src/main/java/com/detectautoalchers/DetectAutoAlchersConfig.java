@@ -70,27 +70,27 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "castThreshold",
         name = "Cast threshold",
-        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Set to 0 to allow fire-staff players to receive hiscore lookups and score-only detection without recent casts. Default: 5 observations.",
+        description = "Alchemy-like observations required inside the observation window before repeated-casting behavior counts. Set to 0 to allow fire-staff players to receive hiscore lookups and score-only detection without recent casts. Default: 10 observations.",
         position = 2,
         section = basicSection
     )
     @Range(min = 0, max = 100)
     default int castThreshold()
     {
-        return 5;
+        return 10;
     }
 
     @ConfigItem(
         keyName = "suspicionThreshold",
         name = "Moderate confidence threshold",
-        description = "Final detection score required before the plugin highlights a moderate-confidence suspected player. Default: 80.",
+        description = "Final detection score required before the plugin highlights a moderate-confidence suspected player. Default: 90.",
         position = 3,
         section = basicSection
     )
     @Range(min = 1, max = 150)
     default int suspicionThreshold()
     {
-        return 80;
+        return 90;
     }
 
     @ConfigItem(
@@ -115,7 +115,7 @@ public interface DetectAutoAlchersConfig extends Config
     @Range(min = 1, max = 300)
     default int highConfidenceThreshold()
     {
-        return 110;
+        return 120;
     }
 
     @ConfigItem(
@@ -340,14 +340,14 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "allowedNonMagicSkillsAboveThreshold",
         name = "Allowed other skills",
-        description = "Some automated alching accounts increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule.<br>Skill level configured above. Default: 2 skills.",
+        description = "Some automated alching accounts increase a small number of non-Magic skills further than necessary to avoid detection<br>i.e. training crafting and fletching to 60, plus training magic, but everything else untouched.<br>This controls the maximum non-Magic skills allowed above the other-skill threshold to not be counted towards the Magic-dominant hiscore rule.<br>Skill level configured above. Default: 1 skill.",
         position = 3,
         section = scoreIncreasesSection
     )
     @Range(min = 0, max = 24)
     default int allowedNonMagicSkillsAboveThreshold()
     {
-        return 2;
+        return 1;
     }
 
     @ConfigItem(
@@ -403,27 +403,27 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "matureAccountScorePenalty",
         name = "Non-Magic total penalty",
-        description = "Detection score subtracted when the non-Magic total threshold is met. Default: -100.",
+        description = "Detection score subtracted when the non-Magic total threshold is met. Default: -150.",
         position = 2,
         section = scoreReductionsSection
     )
     @Range(min = 0, max = 500)
     default int matureAccountScorePenalty()
     {
-        return 100;
+        return 150;
     }
 
     @ConfigItem(
         keyName = "clueCollectionActivityThreshold",
         name = "Clue/log threshold",
-        description = "Combined clue scroll completions and collection-log items at or above this value receive the clue/log score reduction. Default: 4.",
+        description = "Combined clue scroll completions and collection-log items at or above this value receive the clue/log score reduction. Default: 1.",
         position = 3,
         section = scoreReductionsSection
     )
     @Range(min = 1, max = 1000)
     default int clueCollectionActivityThreshold()
     {
-        return 4;
+        return 1;
     }
 
     @ConfigItem(
