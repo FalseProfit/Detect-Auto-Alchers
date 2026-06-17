@@ -22,10 +22,13 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 ## User-facing behavior
 
 - The scene overlay outlines high-confidence suspects in red and moderate-confidence suspects in yellow.
+
 ![Highlight Overlay](docs/images/Player%20Highlighting%20Example.png)
 - The plugin side panel lists current suspects, confidence, score, casts, hiscore evidence, reductions, and time since last seen.
+
 ![Info Panel Example](docs/images/Suspect%20Info%20Panel%20Example.png)
 - When right-click inspect is enabled, the player menu includes an Inspect Alch Activity option that shows the latest manually examined player score in a separate side-panel section without changing detection, watchlist, override, reported, or mobile suppression state.
+
 ![Right Click Menu Example](docs/images/Player%20Menu%20Example.png)
 - The debug menu-score setting adds each right-clicked player's current detection score to the Report option.
 - The side panel can be switched to compact mode for shorter suspect rows.
