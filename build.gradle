@@ -14,6 +14,7 @@ repositories {
 
 def runeLiteVersion = 'latest.release'
 def pluginMainClass = 'com.detectautoalchers.DetectAutoAlchersPluginLauncher'
+def sideloadArchiveName = "${rootProject.name}.jar"
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
@@ -24,15 +25,26 @@ dependencies {
 }
 
 group = 'com.detectautoalchers'
-version = '1.0-SNAPSHOT'
+version = '1.0.0'
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release.set(11)
 }
 
-tasks.named('jar') {
+tasks.named('jar', Jar) {
+    description = 'Builds the plain RuneLite plugin jar for sideload installs.'
     from('runelite-plugin.properties')
+}
+
+tasks.register('sideloadJar', Sync) {
+    dependsOn tasks.named('jar')
+    group = BasePlugin.BUILD_GROUP
+    description = "Builds the RuneLite sideload jar at build/sideloaded-plugins/${sideloadArchiveName}."
+
+    from(tasks.named('jar', Jar).flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir('sideloaded-plugins'))
+    rename { sideloadArchiveName }
 }
 
 tasks.register('run', JavaExec) {
@@ -44,6 +56,7 @@ tasks.register('run', JavaExec) {
 
 tasks.register('shadowJar', Jar) {
     dependsOn configurations.testRuntimeClasspath
+    description = 'Builds a development fat jar with the launcher. Do not use this for RuneLite sideload installs.'
     manifest {
         attributes(
             'Main-Class': pluginMainClass,

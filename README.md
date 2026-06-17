@@ -103,6 +103,92 @@ Preset buttons apply these intent-level profiles:
 - Balanced: middle-ground detection/scoring settings.
 - Aggressive: lower cast and score thresholds, broad fire-rune staff matching, Magic threshold 21, and lighter played-account reductions.
 
+## Sideload install
+
+This plugin is not distributed through RuneLite Plugin Hub. The supported end-user artifact is the plain sideload jar named `detect-auto-alchers.jar`.
+
+1. Download `detect-auto-alchers.jar` from the latest [GitHub Release](https://github.com/FalseProfit/Detect-Auto-Alchers/releases).
+2. Close RuneLite.
+3. Create RuneLite's sideload folder if it does not exist.
+4. Copy `detect-auto-alchers.jar` into that sideload folder.
+5. Start the standalone RuneLite client with `--developer-mode`.
+6. Open RuneLite's plugin panel, search for `Detect Auto Alchers`, and enable it.
+
+The sideload folder is:
+
+```text
+macOS/Linux: ~/.runelite/sideloaded-plugins/
+Windows:     %USERPROFILE%\.runelite\sideloaded-plugins\
+```
+
+macOS/Linux install example:
+
+```sh
+mkdir -p ~/.runelite/sideloaded-plugins
+cp detect-auto-alchers.jar ~/.runelite/sideloaded-plugins/
+```
+
+Windows PowerShell install example:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.runelite\sideloaded-plugins"
+Copy-Item .\detect-auto-alchers.jar "$env:USERPROFILE\.runelite\sideloaded-plugins\"
+```
+
+Standalone RuneLite launch examples:
+
+```sh
+# macOS, if RuneLite is installed in /Applications
+/Applications/RuneLite.app/Contents/MacOS/RuneLite --developer-mode
+
+# Linux, if RuneLite is on PATH
+runelite --developer-mode
+```
+
+```bat
+REM Windows, adjust the executable path if RuneLite is installed elsewhere
+"%LOCALAPPDATA%\RuneLite\RuneLite.exe" --developer-mode
+```
+
+To update the plugin, close RuneLite, replace the old jar in `sideloaded-plugins` with the new `detect-auto-alchers.jar`, and start standalone RuneLite with `--developer-mode` again.
+
+### Jagex Launcher and Jagex accounts
+
+Sideloaded plugins require RuneLite developer mode. Current RuneLite source loads jars from `~/.runelite/sideloaded-plugins/` only when developer mode is active, and current developer mode is ignored when RuneLite is started with Jagex Launcher metadata. In practice, use the Jagex Launcher to authenticate a character, then use standalone RuneLite with `--developer-mode` to load the sideloaded jar.
+
+For one Jagex-account character:
+
+1. Open the Jagex Launcher.
+2. Select the in-game character, for example `usernameA`.
+3. Launch RuneLite normally from the Jagex Launcher.
+4. If RuneLite asks to remember or cache credentials, allow it.
+5. Let RuneLite reach the login screen, lobby, or game once, then close RuneLite.
+6. Start standalone RuneLite with `--developer-mode`.
+
+For multiple in-game characters, repeat those steps per character:
+
+1. Launch `usernameA` from the Jagex Launcher, allow RuneLite to cache credentials, close RuneLite, then launch standalone RuneLite with `--developer-mode`.
+2. Launch `usernameB` from the Jagex Launcher, allow RuneLite to cache credentials, close RuneLite, then launch standalone RuneLite with `--developer-mode`.
+3. Repeat for each additional character.
+
+If standalone RuneLite does not reuse the cached login, RuneLite also has advanced development flags for explicit session files. The session file must be written during a Jagex Launcher-backed RuneLite start first. If your RuneLite/Jagex Launcher setup supports passing extra RuneLite arguments, launch `usernameA` from the Jagex Launcher with:
+
+```text
+--insecure-write-credentials --sessionfile /absolute/path/to/.runelite/session-usernameA --profile usernameA
+```
+
+Close RuneLite after it writes the session file, then start standalone RuneLite with the same session file:
+
+```sh
+/Applications/RuneLite.app/Contents/MacOS/RuneLite --developer-mode --sessionfile "$HOME/.runelite/session-usernameA" --profile usernameA
+```
+
+```bat
+"%LOCALAPPDATA%\RuneLite\RuneLite.exe" --developer-mode --sessionfile "%USERPROFILE%\.runelite\session-usernameA" --profile usernameA
+```
+
+Repeat with a separate file and profile for each additional character, such as `session-usernameB` with `--profile usernameB`. RuneLite's `--insecure-write-credentials` flag can dump Jagex Launcher authentication tokens to a session file for development. Treat any session file as a password: keep it private, do not upload it, do not share it, and use a separate session file per character if running multiple accounts. This is an advanced local workflow, not an official Plugin Hub or Jagex Launcher distribution path.
+
 ## Development
 
 Install JDK 11 for RuneLite plugin development. This project compiles Java 11-compatible bytecode via Gradle's `options.release.set(11)` setting.
@@ -117,3 +203,17 @@ Then run:
 ```
 
 The `run` task starts RuneLite in developer mode with this external plugin loaded.
+
+To build the end-user sideload jar locally:
+
+```sh
+./gradlew clean test sideloadJar
+```
+
+The stable sideload artifact is written to:
+
+```text
+build/sideloaded-plugins/detect-auto-alchers.jar
+```
+
+Do not distribute the `shadowJar` output to end users. It is a development fat jar for launcher/debug flows, not the RuneLite sideload artifact.
