@@ -63,6 +63,26 @@ public class MenuHighlighterTest
     }
 
     @Test
+    public void currentAccountReportedColorOverridesOtherReportedColor()
+    {
+        Color currentAccountColor = new Color(5, 75, 36);
+        Color otherAccountColor = new Color(144, 238, 144);
+        MenuEntry entry = testMenuEntry("Report", "<col=ffffff>Shared Bot<col=ff0000> (level-3)");
+
+        MenuHighlighter.highlight(
+            new MenuEntry[]{entry},
+            Collections.singletonMap("shared bot", DetectionConfidence.HIGH),
+            Collections.singleton("shared bot"),
+            currentAccountColor,
+            Collections.singleton("shared bot"),
+            otherAccountColor
+        );
+
+        assertEquals(MenuHighlighter.colorTarget("Shared Bot (level-3)", currentAccountColor), entry.getTarget());
+        assertEquals(MenuHighlighter.colorText("Report", currentAccountColor), entry.getOption());
+    }
+
+    @Test
     public void sortsHighConfidencePlayersLastInMenuArrayForVisibleTopOrder()
     {
         Map<String, DetectionConfidence> confidenceByName = new LinkedHashMap<>();

@@ -11,6 +11,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -22,6 +23,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -35,6 +38,21 @@ import org.junit.Test;
 
 public class DetectAutoAlchersPluginTest
 {
+    @Test
+    public void stoppingIoExecutorCancelsPollingTask() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        ScheduledFuture<?> pollingTask = executor.scheduleWithFixedDelay(() -> { }, 1, 1, TimeUnit.HOURS);
+        setField(plugin, "ioExecutor", executor);
+        setField(plugin, "playerListPollTask", pollingTask);
+
+        plugin.stopIoExecutor();
+
+        assertTrue(pollingTask.isCancelled());
+        assertTrue(executor.isShutdown());
+    }
+
     @Test
     public void examineMenuEntryUsesSuspiciousTargetColor() throws Exception
     {
@@ -116,6 +134,155 @@ public class DetectAutoAlchersPluginTest
             MenuHighlighter.colorTarget("Reported Bot (level-48)", reportedColor),
             createdEntries.get(0).getTarget()
         );
+    }
+
+    @Test
+    public void menuUsesMediumGreenForBotReportedByCurrentAccount() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        Color otherAccountColor = new Color(144, 238, 144);
+        Color currentAccountColor = new Color(5, 75, 36);
+        ReportedPlayerStore reportedPlayerStore = new ReportedPlayerStore(
+            Files.createTempDirectory("daa-test").resolve("reported.csv")
+        );
+        reportedPlayerStore.record("reported bot", "Reported Bot", Instant.EPOCH, "42");
+
+        setField(plugin, "client", testClient(new ArrayList<>(), 42L));
+        setField(
+            plugin,
+            "config",
+            menuDecorationConfig(false, true, true, otherAccountColor, currentAccountColor)
+        );
+        setField(plugin, "detectorService", new DetectorService());
+        setField(plugin, "reportedPlayerStore", reportedPlayerStore);
+        MenuEntry report = testMenuEntry("Report", "<col=ffffff>Reported Bot<col=ff0000> (level-48)");
+
+        invokePrivate(
+            plugin,
+            "decorateMenuEntries",
+            new Class<?>[]{MenuEntry[].class, DetectorConfigSnapshot.class},
+            new MenuEntry[]{report},
+            configWithCastAndModerateThreshold(0, 60)
+        );
+
+        assertEquals(MenuHighlighter.colorTarget("Reported Bot (level-48)", currentAccountColor), report.getTarget());
+    }
+
+    @Test
+    public void persistenceDisabledKeepsReportInCurrentSessionOnly() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        Color currentAccountColor = new Color(5, 75, 36);
+        ReportedPlayerStore reportedPlayerStore = new ReportedPlayerStore(
+            Files.createTempDirectory("daa-test").resolve("reported.csv")
+        );
+        DetectorService detectorService = new DetectorService();
+        setField(plugin, "client", testClient(new ArrayList<>(), 42L));
+        setField(
+            plugin,
+            "config",
+            menuDecorationConfig(false, true, false, new Color(144, 238, 144), currentAccountColor)
+        );
+        setField(plugin, "detectorService", detectorService);
+        setField(plugin, "reportedPlayerStore", reportedPlayerStore);
+
+        invokePrivate(
+            plugin,
+            "recordReportedPlayer",
+            new Class<?>[]{String.class, String.class},
+            "session bot",
+            "Session Bot"
+        );
+
+        assertTrue(detectorService.isSuppressed("Session Bot"));
+        assertFalse(reportedPlayerStore.contains("Session Bot"));
+        MenuEntry report = testMenuEntry("Report", "<col=ffffff>Session Bot<col=ff0000> (level-48)");
+        invokePrivate(
+            plugin,
+            "decorateMenuEntries",
+            new Class<?>[]{MenuEntry[].class, DetectorConfigSnapshot.class},
+            new MenuEntry[]{report},
+            configWithCastAndModerateThreshold(0, 60)
+        );
+        assertEquals(MenuHighlighter.colorTarget("Session Bot (level-48)", currentAccountColor), report.getTarget());
+    }
+
+    @Test
+    public void persistenceToggleAddsAndRemovesOnlySharedHistorySuppressions() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        DetectorService detectorService = new DetectorService();
+        ReportedPlayerStore reportedStore = new ReportedPlayerStore(
+            Files.createTempDirectory("daa-test").resolve("reported.csv")
+        );
+        reportedStore.record("stored bot", "Stored Bot", Instant.EPOCH, "99");
+        ReportedPlayerSession session = new ReportedPlayerSession();
+        session.record("42", "Session Bot");
+        AtomicBoolean persist = new AtomicBoolean(false);
+        setField(plugin, "config", persistenceConfig(persist));
+        setField(plugin, "detectorService", detectorService);
+        setField(plugin, "reportedPlayerStore", reportedStore);
+        setField(plugin, "reportedPlayerSession", session);
+        setField(plugin, "activeAccountUid", "42");
+
+        invokePrivate(plugin, "syncReportedSuppressions", new Class<?>[0]);
+        assertTrue(detectorService.isSuppressed("Session Bot"));
+        assertFalse(detectorService.isSuppressed("Stored Bot"));
+
+        persist.set(true);
+        invokePrivate(plugin, "syncReportedSuppressions", new Class<?>[0]);
+        assertTrue(detectorService.isSuppressed("Session Bot"));
+        assertTrue(detectorService.isSuppressed("Stored Bot"));
+
+        persist.set(false);
+        invokePrivate(plugin, "syncReportedSuppressions", new Class<?>[0]);
+        assertTrue(detectorService.isSuppressed("Session Bot"));
+        assertFalse(detectorService.isSuppressed("Stored Bot"));
+    }
+
+    @Test
+    public void pollingReloadsSharedListsAndReconcilesSuppressions() throws Exception
+    {
+        DetectAutoAlchersPlugin plugin = new DetectAutoAlchersPlugin();
+        DetectorService detectorService = new DetectorService();
+        Path directory = Files.createTempDirectory("daa-test");
+        Path reportedPath = directory.resolve("reported.csv");
+        Path watchlistPath = directory.resolve("watchlist.csv");
+        Path overridePath = directory.resolve("override.csv");
+        ReportedPlayerStore reportedStore = new ReportedPlayerStore(reportedPath);
+        ReportedPlayerStore watchStore = new ReportedPlayerStore(watchlistPath, "date_watched");
+        ReportedPlayerStore overrideStore = new ReportedPlayerStore(overridePath, "date_allowlisted");
+        reportedStore.load();
+        watchStore.load();
+        overrideStore.load();
+
+        setField(plugin, "client", testClient(new ArrayList<>(), 42L));
+        setField(
+            plugin,
+            "config",
+            menuDecorationConfig(false, true, true, new Color(144, 238, 144), new Color(5, 75, 36))
+        );
+        setField(plugin, "detectorService", detectorService);
+        setField(plugin, "reportedPlayerStore", reportedStore);
+        setField(plugin, "watchlistStore", watchStore);
+        setField(plugin, "overrideListStore", overrideStore);
+
+        new ReportedPlayerStore(reportedPath).record("reported bot", "Reported Bot", Instant.EPOCH, "99");
+        new ReportedPlayerStore(watchlistPath, "date_watched").record("watched bot", "Watched Bot", Instant.EPOCH, "99");
+        new ReportedPlayerStore(overridePath, "date_allowlisted").record("allowed bot", "Allowed Bot", Instant.EPOCH, "99");
+        invokePrivate(plugin, "pollPlayerLists", new Class<?>[0]);
+
+        assertTrue(reportedStore.contains("Reported Bot"));
+        assertTrue(watchStore.contains("Watched Bot"));
+        assertTrue(overrideStore.contains("Allowed Bot"));
+        assertTrue(detectorService.isSuppressed("Reported Bot"));
+        assertTrue(detectorService.isSuppressed("Allowed Bot"));
+
+        new ReportedPlayerStore(reportedPath).clear();
+        new ReportedPlayerStore(overridePath, "date_allowlisted").clear();
+        invokePrivate(plugin, "pollPlayerLists", new Class<?>[0]);
+        assertFalse(detectorService.isSuppressed("Reported Bot"));
+        assertFalse(detectorService.isSuppressed("Allowed Bot"));
     }
 
     @Test
@@ -531,6 +698,11 @@ public class DetectAutoAlchersPluginTest
 
     private static Client testClient(List<MenuEntry> createdEntries)
     {
+        return testClient(createdEntries, 0L);
+    }
+
+    private static Client testClient(List<MenuEntry> createdEntries, long accountHash)
+    {
         return (Client) Proxy.newProxyInstance(
             Client.class.getClassLoader(),
             new Class<?>[]{Client.class},
@@ -541,6 +713,10 @@ public class DetectAutoAlchersPluginTest
                     createdEntries.add(entry);
                     return entry;
                 }
+                if ("getAccountHash".equals(method.getName()))
+                {
+                    return accountHash;
+                }
                 return defaultValue(method.getReturnType());
             }
         );
@@ -550,6 +726,33 @@ public class DetectAutoAlchersPluginTest
         boolean showMenuDetectionScores,
         boolean colorMenuEntries,
         Color reportedColor)
+    {
+        return menuDecorationConfig(
+            showMenuDetectionScores,
+            colorMenuEntries,
+            true,
+            reportedColor,
+            new Color(5, 75, 36)
+        );
+    }
+
+    private static DetectAutoAlchersConfig persistenceConfig(AtomicBoolean persist)
+    {
+        return (DetectAutoAlchersConfig) Proxy.newProxyInstance(
+            DetectAutoAlchersConfig.class.getClassLoader(),
+            new Class<?>[]{DetectAutoAlchersConfig.class},
+            (proxy, method, args) -> "persistReportedPlayers".equals(method.getName())
+                ? persist.get()
+                : defaultValue(method.getReturnType())
+        );
+    }
+
+    private static DetectAutoAlchersConfig menuDecorationConfig(
+        boolean showMenuDetectionScores,
+        boolean colorMenuEntries,
+        boolean persistReportedPlayers,
+        Color reportedColor,
+        Color currentAccountReportedColor)
     {
         return (DetectAutoAlchersConfig) Proxy.newProxyInstance(
             DetectAutoAlchersConfig.class.getClassLoader(),
@@ -563,6 +766,10 @@ public class DetectAutoAlchersPluginTest
                         return colorMenuEntries;
                     case "reportedPlayerHighlightColor":
                         return reportedColor;
+                    case "currentAccountReportedHighlightColor":
+                        return currentAccountReportedColor;
+                    case "persistReportedPlayers":
+                        return persistReportedPlayers;
                     default:
                         return defaultValue(method.getReturnType());
                 }

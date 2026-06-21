@@ -25,6 +25,7 @@ final class DetectAutoAlchersOverlay extends Overlay
     private final DetectorService detectorService;
     private final ReportedPlayerStore reportedPlayerStore;
     private final ReportedPlayerStore watchlistStore;
+    private final ReportedPlayerSession reportedPlayerSession;
     private final DetectAutoAlchersConfig config;
     private final ModelOutlineRenderer modelOutlineRenderer;
 
@@ -34,6 +35,7 @@ final class DetectAutoAlchersOverlay extends Overlay
         DetectorService detectorService,
         ReportedPlayerStore reportedPlayerStore,
         @Named("watchlist") ReportedPlayerStore watchlistStore,
+        ReportedPlayerSession reportedPlayerSession,
         DetectAutoAlchersConfig config,
         ModelOutlineRenderer modelOutlineRenderer)
     {
@@ -41,6 +43,7 @@ final class DetectAutoAlchersOverlay extends Overlay
         this.detectorService = detectorService;
         this.reportedPlayerStore = reportedPlayerStore;
         this.watchlistStore = watchlistStore;
+        this.reportedPlayerSession = reportedPlayerSession;
         this.config = config;
         this.modelOutlineRenderer = modelOutlineRenderer;
         setPosition(OverlayPosition.DYNAMIC);
@@ -68,9 +71,10 @@ final class DetectAutoAlchersOverlay extends Overlay
                 continue;
             }
 
-            if (config.highlightReportedPlayers() && reportedPlayerStore.contains(player.getName()))
+            Color reportedColor = reportedColorFor(player.getName());
+            if (reportedColor != null)
             {
-                drawPlayer(graphics, player, config.reportedPlayerHighlightColor());
+                drawPlayer(graphics, player, reportedColor);
             }
             else if (watchlistStore.contains(player.getName()))
             {
@@ -87,6 +91,29 @@ final class DetectAutoAlchersOverlay extends Overlay
         }
 
         return null;
+    }
+
+    Color reportedColorFor(String displayName)
+    {
+        if (!config.highlightReportedPlayers())
+        {
+            return null;
+        }
+        String accountUid = currentAccountUid();
+        if (reportedPlayerSession.contains(accountUid, displayName)
+            || (config.persistReportedPlayers() && reportedPlayerStore.containsForAccount(displayName, accountUid)))
+        {
+            return config.currentAccountReportedHighlightColor();
+        }
+        return config.persistReportedPlayers() && reportedPlayerStore.contains(displayName)
+            ? config.reportedPlayerHighlightColor()
+            : null;
+    }
+
+    private String currentAccountUid()
+    {
+        long accountHash = client.getAccountHash();
+        return accountHash == -1L ? null : Long.toUnsignedString(accountHash);
     }
 
     private Color confidenceColor(DetectionConfidence confidence)

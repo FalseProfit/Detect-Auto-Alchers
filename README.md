@@ -34,8 +34,9 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - The side panel can be switched to compact mode for shorter suspect rows.
 - Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
 - Right-click player menu entries are sorted by confidence when menu sorting is enabled: high confidence first, then moderate confidence, then unflagged entries.
-- When you click RuneLite's normal Report option, the plugin suppresses that player from future suspect highlighting. If reported-player persistence is enabled, the player is also saved locally across restarts.
-- Previously reported players can be outlined and menu-colored with a separate configurable reported-player color.
+- When you click RuneLite's normal Report option, the plugin suppresses that player for the current account's RuneLite session. If reported-player persistence is enabled, the player and the reporting account's stable RuneScape account UID are also saved locally across restarts.
+- Players reported by the current account are outlined and menu-colored `#054B24` by default. Players reported by another local account, or loaded from unattributed legacy history, use the existing light-green reported-player color until the current account also reports them.
+- The three shared player-list files are checked for changes every two seconds so concurrent RuneLite clients receive report, watchlist, and override updates without restarting.
 - The side panel can import, export, and clear local reported-player history.
 - The side panel includes a visual watchlist. Watched players can be outlined and shown in the panel when seen, but watchlist entries do not change detection score or confidence.
 - The watchlist can remove entries already present in reported-player history, or entries whose normal OSRS hiscore lookup returns not found. The hiscore cleanup is a heuristic and is not proof of a ban, because renamed or missing-name accounts can also fail name-based lookup.
@@ -64,7 +65,8 @@ The plugin never submits reports automatically.
 - Right-click inspect players: disabled
 - Persistent reported-player history: enabled
 - Reported-player highlighting: enabled
-- Reported-player highlight color: RGB `144,238,144`
+- Other-account/legacy reported-player highlight color: RGB `144,238,144`
+- Current-account reported-player highlight color: `#054B24` (RGB `5,75,36`)
 - Compact panel mode: disabled
 - Hiscore scoring: enabled
 - Minimum Magic threshold: Magic level 53. Set to 21 to include Low Alchemy capable accounts.
@@ -95,7 +97,13 @@ Reported players are saved locally at:
 ~/.runelite/detect-auto-alchers/override-list.csv
 ```
 
-The reported-player CSV stores `normalized_name`, `display_name`, and `date_reported`. The watchlist CSV stores `normalized_name`, `display_name`, and `date_watched`. The Override list CSV stores `normalized_name`, `display_name`, and `date_allowlisted`. Reported players and Override list players are suppressed from future suspect highlighting. Watchlist players are visual only.
+The reported-player CSV stores `normalized_name`, `display_name`, `date_reported`, and `reporter_uids`. `reporter_uids` is a semicolon-separated set so several local accounts can retain attribution for the same reported player. The watchlist and Override list CSVs store their existing name/date columns plus `modified_by_uid`, identifying the account that most recently added or updated the extant row. This is provenance metadata, not an audit log; removed rows leave no deletion record.
+
+Older three-column CSVs remain supported. Their rows have no account attribution and therefore use the other-account/legacy reported color until the current account reports the same player. Successful writes and exports use the new four-column schema.
+
+Reported players and Override list players are suppressed from future suspect highlighting. Watchlist players are visual only. Disabling **Persist reported players** stops shared reported history from being written or applied, but reports made by that account remain suppressed and use its current-account color until that RuneLite process exits. Reports made while persistence is disabled are not written retroactively if the setting is enabled later.
+
+The UID columns contain RuneLite's stable per-RuneScape-account hash encoded as an unsigned decimal number. They are not usernames or login credentials, but they are persistent pseudonymous identifiers. Keep the CSVs and reported-history exports private unless you intentionally want to share that metadata.
 
 Preset buttons apply these intent-level profiles:
 

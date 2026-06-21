@@ -54,7 +54,7 @@ final class MenuHighlighter
 
     static void highlight(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
     {
-        highlight(menuEntries, confidenceByName, Collections.emptySet(), null);
+        highlight(menuEntries, confidenceByName, Collections.emptySet(), null, Collections.emptySet(), null);
     }
 
     static void sortByConfidence(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
@@ -102,7 +102,28 @@ final class MenuHighlighter
         Set<String> reportedNames,
         Color reportedColor)
     {
-        if (menuEntries == null || (confidenceByName.isEmpty() && reportedNames.isEmpty()))
+        highlight(
+            menuEntries,
+            confidenceByName,
+            Collections.emptySet(),
+            null,
+            reportedNames,
+            reportedColor
+        );
+    }
+
+    static void highlight(
+        MenuEntry[] menuEntries,
+        Map<String, DetectionConfidence> confidenceByName,
+        Set<String> currentAccountReportedNames,
+        Color currentAccountReportedColor,
+        Set<String> otherReportedNames,
+        Color otherReportedColor)
+    {
+        if (menuEntries == null
+            || (confidenceByName.isEmpty()
+                && currentAccountReportedNames.isEmpty()
+                && otherReportedNames.isEmpty()))
         {
             return;
         }
@@ -114,7 +135,11 @@ final class MenuHighlighter
                 continue;
             }
 
-            Color color = reportedColorFor(entry, reportedNames, reportedColor);
+            Color color = reportedColorFor(entry, currentAccountReportedNames, currentAccountReportedColor);
+            if (color == null)
+            {
+                color = reportedColorFor(entry, otherReportedNames, otherReportedColor);
+            }
             if (color == null)
             {
                 DetectionConfidence confidence = confidenceFor(entry, confidenceByName);
