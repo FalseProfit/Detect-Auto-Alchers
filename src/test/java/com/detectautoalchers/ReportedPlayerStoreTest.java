@@ -69,6 +69,43 @@ public class ReportedPlayerStoreTest
     }
 
     @Test
+    public void recordMergesFreshCsvFromOtherStoreInstance() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore firstStore = new ReportedPlayerStore(path);
+        ReportedPlayerStore staleStore = new ReportedPlayerStore(path);
+        staleStore.load();
+
+        firstStore.record("first bot", "First Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        staleStore.record("second bot", "Second Bot", Instant.parse("2026-04-27T14:35:22Z"));
+
+        ReportedPlayerStore verifier = new ReportedPlayerStore(path);
+        verifier.load();
+        assertTrue(verifier.contains("First Bot"));
+        assertTrue(verifier.contains("Second Bot"));
+        assertEquals(2, verifier.getNormalizedNames().size());
+    }
+
+    @Test
+    public void recordDoesNotResurrectEntryRemovedByOtherStoreInstance() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore firstStore = new ReportedPlayerStore(path);
+        ReportedPlayerStore staleStore = new ReportedPlayerStore(path);
+
+        firstStore.record("stale bot", "Stale Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        staleStore.load();
+        firstStore.remove("Stale Bot");
+        staleStore.record("fresh bot", "Fresh Bot", Instant.parse("2026-04-27T14:35:22Z"));
+
+        ReportedPlayerStore verifier = new ReportedPlayerStore(path);
+        verifier.load();
+        assertFalse(verifier.contains("Stale Bot"));
+        assertTrue(verifier.contains("Fresh Bot"));
+        assertEquals(1, verifier.getNormalizedNames().size());
+    }
+
+    @Test
     public void clearEmptiesMemoryAndFile() throws Exception
     {
         Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");

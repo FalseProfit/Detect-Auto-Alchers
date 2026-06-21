@@ -1,11 +1,14 @@
 package com.detectautoalchers;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -16,6 +19,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 import net.runelite.client.RuneLite;
 
 final class ReportedPlayerStore
@@ -27,6 +33,7 @@ final class ReportedPlayerStore
     private static final String REPORTED_FILE_NAME = "reported-players.csv";
     private static final String WATCHLIST_FILE_NAME = "watchlist.csv";
     private static final String OVERRIDE_LIST_FILE_NAME = "override-list.csv";
+    private static final ConcurrentMap<Path, ReentrantLock> JVM_LOCKS = new ConcurrentHashMap<>();
 
     private final Path path;
     private final String dateColumnName;
@@ -68,8 +75,7 @@ final class ReportedPlayerStore
 
     synchronized void load() throws IOException
     {
-        reportedPlayers.clear();
-        reportedPlayers.putAll(read(path, dateColumnName));
+        replaceReportedPlayers(withStoreLock(() -> read(path, dateColumnName)));
     }
 
     synchronized void record(String normalizedName, String displayName, Instant dateReported) throws IOException
@@ -86,39 +92,62 @@ final class ReportedPlayerStore
             return;
         }
 
-        reportedPlayers.put(normalized, new ReportedPlayer(normalized, display, dateReported));
-        save();
+        withStoreLock(() ->
+        {
+            Map<String, ReportedPlayer> players = read(path, dateColumnName);
+            players.put(normalized, new ReportedPlayer(normalized, display, dateReported));
+            saveTo(path, players.values(), dateColumnName);
+            replaceReportedPlayers(players);
+            return null;
+        });
     }
 
     synchronized void remove(String normalizedName) throws IOException
     {
-        reportedPlayers.remove(DetectorService.normalizeName(normalizedName));
-        save();
+        String normalized = DetectorService.normalizeName(normalizedName);
+        withStoreLock(() ->
+        {
+            Map<String, ReportedPlayer> players = read(path, dateColumnName);
+            players.remove(normalized);
+            saveTo(path, players.values(), dateColumnName);
+            replaceReportedPlayers(players);
+            return null;
+        });
     }
 
     synchronized int removeAll(Collection<String> normalizedNames) throws IOException
     {
-        int removed = 0;
-        for (String normalizedName : normalizedNames)
+        return withStoreLock(() ->
         {
-            String normalized = DetectorService.normalizeName(normalizedName);
-            if (!normalized.isEmpty() && reportedPlayers.remove(normalized) != null)
+            Map<String, ReportedPlayer> players = read(path, dateColumnName);
+            int removed = 0;
+            for (String normalizedName : normalizedNames)
             {
-                removed++;
+                String normalized = DetectorService.normalizeName(normalizedName);
+                if (!normalized.isEmpty() && players.remove(normalized) != null)
+                {
+                    removed++;
+                }
             }
-        }
 
-        if (removed > 0)
-        {
-            save();
-        }
-        return removed;
+            if (removed > 0)
+            {
+                saveTo(path, players.values(), dateColumnName);
+            }
+            replaceReportedPlayers(players);
+            return removed;
+        });
     }
 
     synchronized void clear() throws IOException
     {
-        reportedPlayers.clear();
-        save();
+        withStoreLock(() ->
+        {
+            Map<String, ReportedPlayer> players = new LinkedHashMap<>();
+            saveTo(path, players.values(), dateColumnName);
+            replaceReportedPlayers(players);
+            return null;
+        });
     }
 
     synchronized void exportTo(Path exportPath) throws IOException
@@ -129,13 +158,16 @@ final class ReportedPlayerStore
     synchronized void importFrom(Path importPath, ImportMode mode) throws IOException
     {
         Map<String, ReportedPlayer> importedPlayers = read(importPath, dateColumnName);
-        if (mode == ImportMode.REPLACE)
+        withStoreLock(() ->
         {
-            reportedPlayers.clear();
-        }
-
-        reportedPlayers.putAll(importedPlayers);
-        save();
+            Map<String, ReportedPlayer> players = mode == ImportMode.REPLACE
+                ? new LinkedHashMap<>()
+                : read(path, dateColumnName);
+            players.putAll(importedPlayers);
+            saveTo(path, players.values(), dateColumnName);
+            replaceReportedPlayers(players);
+            return null;
+        });
     }
 
     synchronized boolean contains(String displayName)
@@ -158,9 +190,38 @@ final class ReportedPlayerStore
         return path;
     }
 
-    private void save() throws IOException
+    private void replaceReportedPlayers(Map<String, ReportedPlayer> players)
     {
-        saveTo(path, reportedPlayers.values(), dateColumnName);
+        reportedPlayers.clear();
+        reportedPlayers.putAll(players);
+    }
+
+    private <T> T withStoreLock(LockedOperation<T> operation) throws IOException
+    {
+        Path lockPath = lockPath(path);
+        Path lockParent = lockPath.getParent();
+        if (lockParent != null)
+        {
+            Files.createDirectories(lockParent);
+        }
+
+        ReentrantLock jvmLock = JVM_LOCKS.computeIfAbsent(lockPath, ignored -> new ReentrantLock());
+        jvmLock.lock();
+        try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+             FileLock ignored = lockChannel.lock())
+        {
+            return operation.run();
+        }
+        finally
+        {
+            jvmLock.unlock();
+        }
+    }
+
+    private static Path lockPath(Path source)
+    {
+        Path absolute = source.toAbsolutePath().normalize();
+        return absolute.resolveSibling(absolute.getFileName() + ".lock");
     }
 
     private static Map<String, ReportedPlayer> read(Path source, String dateColumnName) throws IOException
@@ -220,11 +281,9 @@ final class ReportedPlayerStore
     private static void saveTo(Path destination, Collection<ReportedPlayer> players, String dateColumnName)
         throws IOException
     {
-        Path parent = destination.getParent();
-        if (parent != null)
-        {
-            Files.createDirectories(parent);
-        }
+        Path absoluteDestination = destination.toAbsolutePath();
+        Path parent = absoluteDestination.getParent();
+        Files.createDirectories(parent);
 
         List<String> lines = new ArrayList<>();
         lines.add("normalized_name,display_name," + dateColumnName);
@@ -235,15 +294,19 @@ final class ReportedPlayerStore
                 + "," + csv(reportedPlayer.getDateReported().toString()));
         }
 
-        Path temp = destination.resolveSibling(destination.getFileName() + ".tmp");
-        Files.write(temp, lines, StandardCharsets.UTF_8);
+        Path temp = Files.createTempFile(parent, destination.getFileName().toString() + ".", ".tmp");
         try
         {
-            Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            Files.write(temp, lines, StandardCharsets.UTF_8);
+            Files.move(temp, absoluteDestination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         }
         catch (AtomicMoveNotSupportedException ex)
         {
-            Files.move(temp, destination, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(temp, absoluteDestination, StandardCopyOption.REPLACE_EXISTING);
+        }
+        finally
+        {
+            Files.deleteIfExists(temp);
         }
     }
 
@@ -356,5 +419,10 @@ final class ReportedPlayerStore
         {
             return Instant.EPOCH;
         }
+    }
+
+    private interface LockedOperation<T>
+    {
+        T run() throws IOException;
     }
 }
