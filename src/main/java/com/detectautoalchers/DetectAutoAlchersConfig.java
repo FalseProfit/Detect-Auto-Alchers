@@ -218,7 +218,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "sortMenuEntriesByConfidence",
         name = "Sort menu entries",
-        description = "Sort right-click player menu entries by detection confidence: high first, then moderate, then unflagged. Default: off.",
+        description = "Sort right-click player menu entries: high confidence first, then moderate confidence, then players reported by another account. Players reported by this account remain unsorted. Default: off.",
         position = 13,
         section = basicSection
     )

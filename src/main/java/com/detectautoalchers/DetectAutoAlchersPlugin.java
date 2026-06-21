@@ -435,8 +435,14 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
+        refreshCurrentAccountUid();
         MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
-        MenuHighlighter.sortByConfidence(menuEntries, detectorService.getSuspiciousConfidenceByName());
+        MenuHighlighter.sortByPriority(
+            menuEntries,
+            detectorService.getSuspiciousConfidenceByName(),
+            currentAccountReportedNames(),
+            otherAccountReportedNames()
+        );
         client.getMenu().setMenuEntries(menuEntries);
     }
 

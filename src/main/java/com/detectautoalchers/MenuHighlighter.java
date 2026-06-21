@@ -59,12 +59,33 @@ final class MenuHighlighter
 
     static void sortByConfidence(MenuEntry[] menuEntries, Map<String, DetectionConfidence> confidenceByName)
     {
-        if (menuEntries == null || confidenceByName == null || confidenceByName.isEmpty())
+        sortByPriority(menuEntries, confidenceByName, Collections.emptySet(), Collections.emptySet());
+    }
+
+    static void sortByPriority(
+        MenuEntry[] menuEntries,
+        Map<String, DetectionConfidence> confidenceByName,
+        Set<String> currentAccountReportedNames,
+        Set<String> otherAccountReportedNames)
+    {
+        Map<String, DetectionConfidence> confidence = confidenceByName == null
+            ? Collections.emptyMap()
+            : confidenceByName;
+        Set<String> currentReported = currentAccountReportedNames == null
+            ? Collections.emptySet()
+            : currentAccountReportedNames;
+        Set<String> otherReported = otherAccountReportedNames == null
+            ? Collections.emptySet()
+            : otherAccountReportedNames;
+        if (menuEntries == null || (confidence.isEmpty() && otherReported.isEmpty()))
         {
             return;
         }
 
-        Arrays.sort(menuEntries, Comparator.comparingInt(entry -> menuPriority(entry, confidenceByName)));
+        Arrays.sort(
+            menuEntries,
+            Comparator.comparingInt(entry -> menuPriority(entry, confidence, currentReported, otherReported))
+        );
     }
 
     static void appendScores(
@@ -242,18 +263,26 @@ final class MenuHighlighter
         return confidenceByName.getOrDefault(matchingName, DetectionConfidence.NONE);
     }
 
-    private static int menuPriority(MenuEntry entry, Map<String, DetectionConfidence> confidenceByName)
+    private static int menuPriority(
+        MenuEntry entry,
+        Map<String, DetectionConfidence> confidenceByName,
+        Set<String> currentAccountReportedNames,
+        Set<String> otherAccountReportedNames)
     {
+        if (entry == null || matchesPlayer(entry, currentAccountReportedNames))
+        {
+            return 0;
+        }
         DetectionConfidence confidence = entry == null ? DetectionConfidence.NONE : confidenceFor(entry, confidenceByName);
         if (confidence == DetectionConfidence.HIGH)
         {
-            return 2;
+            return 3;
         }
         if (confidence == DetectionConfidence.MODERATE)
         {
-            return 1;
+            return 2;
         }
-        return 0;
+        return matchesPlayer(entry, otherAccountReportedNames) ? 1 : 0;
     }
 
     private static Color reportedColorFor(MenuEntry entry, Set<String> reportedNames, Color reportedColor)
@@ -263,14 +292,21 @@ final class MenuHighlighter
             return null;
         }
 
-        Player player = entry.getPlayer();
-        if (player != null && reportedNames.contains(DetectorService.normalizeName(player.getName())))
-        {
-            return reportedColor;
-        }
+        return matchesPlayer(entry, reportedNames) ? reportedColor : null;
+    }
 
-        String matchingName = findMatchingSuspiciousName(entry.getTarget(), reportedNames);
-        return matchingName.isEmpty() ? null : reportedColor;
+    private static boolean matchesPlayer(MenuEntry entry, Set<String> normalizedNames)
+    {
+        if (entry == null || normalizedNames.isEmpty())
+        {
+            return false;
+        }
+        Player player = entry.getPlayer();
+        if (player != null && normalizedNames.contains(DetectorService.normalizeName(player.getName())))
+        {
+            return true;
+        }
+        return !findMatchingSuspiciousName(entry.getTarget(), normalizedNames).isEmpty();
     }
 
     private static Color colorFor(DetectionConfidence confidence)

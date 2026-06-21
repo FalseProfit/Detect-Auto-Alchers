@@ -103,6 +103,36 @@ public class MenuHighlighterTest
     }
 
     @Test
+    public void sortsOtherAccountReportsBelowSuspectsAndLeavesCurrentAccountReportsUnfiltered()
+    {
+        Map<String, DetectionConfidence> confidenceByName = new LinkedHashMap<>();
+        confidenceByName.put("high bot", DetectionConfidence.HIGH);
+        confidenceByName.put("maybe bot", DetectionConfidence.MODERATE);
+        confidenceByName.put("my report", DetectionConfidence.HIGH);
+        MenuEntry high = testMenuEntry("Report", "<col=ffffff>High Bot<col=ff0000> (level-3)");
+        MenuEntry currentReported = testMenuEntry("Report", "<col=ffffff>My Report<col=ff0000> (level-3)");
+        MenuEntry otherReported = testMenuEntry("Report", "<col=ffffff>Other Report<col=ff0000> (level-3)");
+        MenuEntry regular = testMenuEntry("Report", "<col=ffffff>Regular Player<col=ff0000> (level-3)");
+        MenuEntry moderate = testMenuEntry("Report", "<col=ffffff>Maybe Bot<col=ff0000> (level-3)");
+        MenuEntry walkHere = testMenuEntry("Walk here", "");
+        MenuEntry[] entries = {high, currentReported, otherReported, regular, moderate, walkHere};
+
+        MenuHighlighter.sortByPriority(
+            entries,
+            confidenceByName,
+            Collections.singleton("my report"),
+            Collections.singleton("other report")
+        );
+
+        assertSame(currentReported, entries[0]);
+        assertSame(regular, entries[1]);
+        assertSame(walkHere, entries[2]);
+        assertSame(otherReported, entries[3]);
+        assertSame(moderate, entries[4]);
+        assertSame(high, entries[5]);
+    }
+
+    @Test
     public void preservesRelativeOrderWithinSameConfidence()
     {
         Map<String, DetectionConfidence> confidenceByName = Collections.singletonMap("auto bot", DetectionConfidence.HIGH);

@@ -33,7 +33,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - The debug menu-score setting adds each right-clicked player's current detection score to the Report option.
 - The side panel can be switched to compact mode for shorter suspect rows.
 - Right-click menu entries for suspects are colored by confidence when menu coloring is enabled.
-- Right-click player menu entries are sorted by confidence when menu sorting is enabled: high confidence first, then moderate confidence, then unflagged entries.
+- When menu sorting is enabled, right-click player entries are ordered: high-confidence suspects first, moderate-confidence suspects second, players reported by another account third, then everything else in its normal order. Players reported by the current account remain in that unsorted final tier.
 - When you click RuneLite's normal Report option, the plugin suppresses that player for the current account's RuneLite session. If reported-player persistence is enabled, the player and the reporting account's stable RuneScape account UID are also saved locally across restarts.
 - Players reported by the current account are outlined and menu-colored `#054B24` by default. Players reported by another local account, or loaded from unattributed legacy history, use the existing light-green reported-player color until the current account also reports them.
 - The three shared player-list files are checked for changes every two seconds so concurrent RuneLite clients receive report, watchlist, and override updates without restarting.
