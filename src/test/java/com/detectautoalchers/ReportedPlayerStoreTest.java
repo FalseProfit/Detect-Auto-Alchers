@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -38,6 +39,23 @@ public class ReportedPlayerStoreTest
         assertEquals("alch bot", reportedPlayer.getNormalizedName());
         assertEquals("Alch Bot", reportedPlayer.getDisplayName());
         assertEquals(Instant.parse("2026-04-26T14:35:22Z"), reportedPlayer.getDateReported());
+        assertTrue(reportedPlayer.getAccountUids().isEmpty());
+    }
+
+    @Test
+    public void recordsAllReporterUidsForSamePlayer() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.record("shared bot", "Shared Bot", Instant.parse("2026-04-26T14:35:22Z"), "123");
+        store.record("shared bot", "Shared Bot", Instant.parse("2026-04-27T14:35:22Z"), "456");
+        store.record("shared bot", "Shared Bot", Instant.parse("2026-04-28T14:35:22Z"), "123");
+
+        assertTrue(store.containsForAccount("Shared Bot", "123"));
+        assertTrue(store.containsForAccount("Shared Bot", "456"));
+        assertEquals(Set.of("123", "456"), store.getReportedPlayers().iterator().next().getAccountUids());
+        assertTrue(Files.readString(path, StandardCharsets.UTF_8).contains(",123;456"));
     }
 
     @Test
@@ -117,7 +135,10 @@ public class ReportedPlayerStoreTest
         store.clear();
 
         assertFalse(store.contains("clear bot"));
-        assertEquals("normalized_name,display_name,date_reported", Files.readString(path, StandardCharsets.UTF_8).trim());
+        assertEquals(
+            "normalized_name,display_name,date_reported,reporter_uids",
+            Files.readString(path, StandardCharsets.UTF_8).trim()
+        );
     }
 
     @Test
@@ -137,6 +158,24 @@ public class ReportedPlayerStoreTest
         assertTrue(store.contains("Local Bot"));
         assertTrue(store.contains("Import Bot"));
         assertEquals(2, store.getNormalizedNames().size());
+    }
+
+    @Test
+    public void mergeImportCombinesReporterUidSets() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Path importPath = temporaryFolder.newFolder().toPath().resolve("import.csv");
+        Files.write(importPath, List.of(
+            "normalized_name,display_name,date_reported,reporter_uids",
+            "shared bot,Shared Bot,2026-04-27T14:35:22Z,456"
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+        store.record("shared bot", "Shared Bot", Instant.parse("2026-04-26T14:35:22Z"), "123");
+
+        store.importFrom(importPath, ImportMode.MERGE);
+
+        assertTrue(store.containsForAccount("Shared Bot", "123"));
+        assertTrue(store.containsForAccount("Shared Bot", "456"));
     }
 
     @Test
@@ -179,6 +218,94 @@ public class ReportedPlayerStoreTest
         assertFalse(store.contains("formula display"));
         assertFalse(store.contains("spaced formula"));
         assertEquals(1, store.getNormalizedNames().size());
+    }
+
+    @Test
+    public void skipsRowsWithInvalidUidMetadata() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        Files.write(path, List.of(
+            "normalized_name,display_name,date_reported,reporter_uids",
+            "safe bot,Safe Bot,2026-04-27T14:35:22Z,123;456",
+            "bad bot,Bad Bot,2026-04-27T14:35:22Z,123;not-a-uid",
+            "missing uid bot,Missing UID Bot,2026-04-27T14:35:22Z,18446744073709551615"
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.load();
+
+        assertTrue(store.contains("Safe Bot"));
+        assertFalse(store.contains("Bad Bot"));
+        assertFalse(store.contains("Missing UID Bot"));
+    }
+
+    @Test
+    public void skipsRowsExceedingReporterUidLimit() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        StringBuilder uids = new StringBuilder();
+        for (int i = 1; i <= 129; i++)
+        {
+            if (i > 1)
+            {
+                uids.append(';');
+            }
+            uids.append(i);
+        }
+        Files.write(path, List.of(
+            "normalized_name,display_name,date_reported,reporter_uids",
+            "too many bot,Too Many Bot,2026-04-27T14:35:22Z," + uids
+        ), StandardCharsets.UTF_8);
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+
+        store.load();
+
+        assertFalse(store.contains("Too Many Bot"));
+    }
+
+    @Test
+    public void reloadsOnlyAfterFileMetadataChanges() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore staleStore = new ReportedPlayerStore(path);
+        ReportedPlayerStore writer = new ReportedPlayerStore(path);
+        staleStore.load();
+
+        assertFalse(staleStore.reloadIfChanged());
+        writer.record("fresh bot", "Fresh Bot", Instant.EPOCH, "123");
+        assertFalse(staleStore.contains("Fresh Bot"));
+        assertTrue(staleStore.reloadIfChanged());
+        assertTrue(staleStore.contains("Fresh Bot"));
+        assertFalse(staleStore.reloadIfChanged());
+
+        writer.clear();
+        assertTrue(staleStore.reloadIfChanged());
+        assertFalse(staleStore.contains("Fresh Bot"));
+    }
+
+    @Test
+    public void failedReloadRetainsLastKnownGoodSnapshotUntilFileChangesAgain() throws Exception
+    {
+        Path path = temporaryFolder.newFolder().toPath().resolve("reported-players.csv");
+        ReportedPlayerStore store = new ReportedPlayerStore(path);
+        store.record("kept bot", "Kept Bot", Instant.EPOCH, "123");
+        Files.writeString(
+            path,
+            "normalized_name,display_name,wrong_date,reporter_uids\n",
+            StandardCharsets.UTF_8
+        );
+
+        try
+        {
+            store.reloadIfChanged();
+        }
+        catch (java.io.IOException expected)
+        {
+            // Keep the last successfully loaded snapshot.
+        }
+
+        assertTrue(store.contains("Kept Bot"));
+        assertFalse(store.reloadIfChanged());
     }
 
     @Test
@@ -271,11 +398,11 @@ public class ReportedPlayerStoreTest
         Path path = temporaryFolder.newFolder().toPath().resolve("watchlist.csv");
         ReportedPlayerStore store = new ReportedPlayerStore(path, "date_watched");
 
-        store.record("watched bot", "Watched Bot", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("watched bot", "Watched Bot", Instant.parse("2026-04-26T14:35:22Z"), "789");
 
         List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-        assertEquals("normalized_name,display_name,date_watched", lines.get(0));
-        assertTrue(lines.get(1).contains("watched bot,Watched Bot,2026-04-26T14:35:22Z"));
+        assertEquals("normalized_name,display_name,date_watched,modified_by_uid", lines.get(0));
+        assertTrue(lines.get(1).contains("watched bot,Watched Bot,2026-04-26T14:35:22Z,789"));
     }
 
     @Test
@@ -284,11 +411,11 @@ public class ReportedPlayerStoreTest
         Path path = temporaryFolder.newFolder().toPath().resolve("override-list.csv");
         ReportedPlayerStore store = new ReportedPlayerStore(path, "date_allowlisted");
 
-        store.record("allowed player", "Allowed Player", Instant.parse("2026-04-26T14:35:22Z"));
+        store.record("allowed player", "Allowed Player", Instant.parse("2026-04-26T14:35:22Z"), "789");
 
         List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-        assertEquals("normalized_name,display_name,date_allowlisted", lines.get(0));
-        assertTrue(lines.get(1).contains("allowed player,Allowed Player,2026-04-26T14:35:22Z"));
+        assertEquals("normalized_name,display_name,date_allowlisted,modified_by_uid", lines.get(0));
+        assertTrue(lines.get(1).contains("allowed player,Allowed Player,2026-04-26T14:35:22Z,789"));
     }
 
     @SuppressWarnings("unchecked")

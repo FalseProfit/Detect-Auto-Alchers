@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
@@ -67,6 +69,7 @@ public class DetectAutoAlchersPlugin extends Plugin
     private static final String ANIMATION_SOURCE = "animation";
     private static final String SPOT_ANIMATION_SOURCE = "spotanim";
     private static final String EXAMINE_OPTION = "Inspect Alch Activity";
+    private static final long PLAYER_LIST_POLL_INTERVAL_SECONDS = 2L;
     private static final long PANEL_REFRESH_INTERVAL_MILLIS = 5_000L;
     private static final long HISCORE_LOOKUP_TIMEOUT_MILLIS = 10_000L;
     private static final long HISCORE_LOOKUP_RETRY_DELAY_MILLIS = 1_500L;
@@ -111,10 +114,15 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Named("overrideList")
     private ReportedPlayerStore overrideListStore;
 
+    @Inject
+    private ReportedPlayerSession reportedPlayerSession;
+
     private DetectAutoAlchersPanel panel;
     private NavigationButton navButton;
     private ExecutorService ioExecutor;
+    private ScheduledFuture<?> playerListPollTask;
     private DetectorConfigSnapshot configSnapshot;
+    private volatile String activeAccountUid;
     private final Set<String> mobilePlayerNames = new HashSet<>();
     private final PanelRefreshGate panelRefreshGate = new PanelRefreshGate(PANEL_REFRESH_INTERVAL_MILLIS);
     private final AtomicBoolean watchlistHiscoreCleanupInFlight = new AtomicBoolean();
@@ -159,13 +167,16 @@ public class DetectAutoAlchersPlugin extends Plugin
     @Override
     protected void startUp()
     {
-        ioExecutor = Executors.newSingleThreadExecutor(runnable ->
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable ->
         {
             Thread thread = new Thread(runnable, "detect-auto-alchers-io");
             thread.setDaemon(true);
             return thread;
         });
+        ioExecutor = scheduler;
         mobilePlayerNames.clear();
+        sessionReports().clear();
+        refreshCurrentAccountUid();
         detectorService.clear();
         configSnapshot = DetectorConfigSnapshot.from(config);
 
@@ -179,6 +190,12 @@ public class DetectAutoAlchersPlugin extends Plugin
         clientToolbar.addNavigation(navButton);
         overlayManager.add(overlay);
         loadPlayerLists();
+        playerListPollTask = scheduler.scheduleWithFixedDelay(
+            this::pollPlayerLists,
+            PLAYER_LIST_POLL_INTERVAL_SECONDS,
+            PLAYER_LIST_POLL_INTERVAL_SECONDS,
+            TimeUnit.SECONDS
+        );
     }
 
     @Override
@@ -196,7 +213,19 @@ public class DetectAutoAlchersPlugin extends Plugin
         watchlistCleanupProgress = null;
         panelRefreshGate.reset();
         mobilePlayerNames.clear();
+        sessionReports().clear();
+        activeAccountUid = null;
         detectorService.clear();
+        stopIoExecutor();
+    }
+
+    void stopIoExecutor()
+    {
+        if (playerListPollTask != null)
+        {
+            playerListPollTask.cancel(false);
+            playerListPollTask = null;
+        }
         if (ioExecutor != null)
         {
             ioExecutor.shutdownNow();
@@ -219,6 +248,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             return;
         }
+        refreshCurrentAccountUid();
 
         if ("ignoreMobilePlayers".equals(event.getKey()))
         {
@@ -233,14 +263,7 @@ public class DetectAutoAlchersPlugin extends Plugin
         }
         else if ("persistReportedPlayers".equals(event.getKey()))
         {
-            if (config.persistReportedPlayers())
-            {
-                detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
-            }
-            else
-            {
-                detectorService.unsuppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
-            }
+            syncReportedSuppressions();
         }
 
         long nowMillis = System.currentTimeMillis();
@@ -253,6 +276,15 @@ public class DetectAutoAlchersPlugin extends Plugin
     public void onGameStateChanged(GameStateChanged event)
     {
         GameState state = event.getGameState();
+        if (state == GameState.LOGGED_IN)
+        {
+            refreshCurrentAccountUid();
+            syncReportedSuppressions();
+        }
+        else if (state == GameState.LOGIN_SCREEN)
+        {
+            activeAccountUid = null;
+        }
         if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
         {
             clearMobileSuppressions();
@@ -369,6 +401,7 @@ public class DetectAutoAlchersPlugin extends Plugin
 
     private void decorateMenuEntries(MenuEntry[] menuEntries, DetectorConfigSnapshot snapshot)
     {
+        refreshCurrentAccountUid();
         if (config.showMenuDetectionScores())
         {
             MenuHighlighter.appendScores(
@@ -387,7 +420,9 @@ public class DetectAutoAlchersPlugin extends Plugin
         MenuHighlighter.highlight(
             menuEntries,
             detectorService.getSuspiciousConfidenceByName(),
-            reportedPlayerStore.getNormalizedNames(),
+            currentAccountReportedNames(),
+            config.currentAccountReportedHighlightColor(),
+            otherAccountReportedNames(),
             config.reportedPlayerHighlightColor()
         );
     }
@@ -400,8 +435,14 @@ public class DetectAutoAlchersPlugin extends Plugin
             return;
         }
 
+        refreshCurrentAccountUid();
         MenuEntry[] menuEntries = client.getMenu().getMenuEntries();
-        MenuHighlighter.sortByConfidence(menuEntries, detectorService.getSuspiciousConfidenceByName());
+        MenuHighlighter.sortByPriority(
+            menuEntries,
+            detectorService.getSuspiciousConfidenceByName(),
+            currentAccountReportedNames(),
+            otherAccountReportedNames()
+        );
         client.getMenu().setMenuEntries(menuEntries);
     }
 
@@ -546,11 +587,11 @@ public class DetectAutoAlchersPlugin extends Plugin
                 reportedPlayerStore.load();
                 watchlistStore.load();
                 overrideListStore.load();
-                if (config.persistReportedPlayers())
-                {
-                    detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
-                }
-                detectorService.suppressNames(overrideListStore.getNormalizedNames(), SuppressionReason.OVERRIDE);
+                syncReportedSuppressions();
+                detectorService.syncSuppressionReason(
+                    overrideListStore.getNormalizedNames(),
+                    SuppressionReason.OVERRIDE
+                );
                 refreshPanel(System.currentTimeMillis(), true);
             }
             catch (IOException ex)
@@ -560,10 +601,124 @@ public class DetectAutoAlchersPlugin extends Plugin
         });
     }
 
-    private void recordReportedPlayer(String normalizedName, String displayName)
+    private void pollPlayerLists()
+    {
+        boolean changed = false;
+        boolean reportedChanged = reloadIfChanged(reportedPlayerStore, "reported-player history");
+        changed |= reportedChanged;
+        changed |= reloadIfChanged(watchlistStore, "watchlist");
+        boolean overrideChanged = reloadIfChanged(overrideListStore, "override list");
+        changed |= overrideChanged;
+
+        if (reportedChanged)
+        {
+            syncReportedSuppressions();
+        }
+        if (overrideChanged)
+        {
+            detectorService.syncSuppressionReason(
+                overrideListStore.getNormalizedNames(),
+                SuppressionReason.OVERRIDE
+            );
+        }
+        if (changed)
+        {
+            refreshPanel(System.currentTimeMillis(), true);
+        }
+    }
+
+    private boolean reloadIfChanged(ReportedPlayerStore store, String description)
+    {
+        try
+        {
+            return store.reloadIfChanged();
+        }
+        catch (IOException ex)
+        {
+            log.warn("Unable to reload {} from {}", description, store.getPath(), ex);
+            return false;
+        }
+    }
+
+    private void syncReportedSuppressions()
+    {
+        Set<String> effectiveNames = currentSessionReportedNames();
+        if (config.persistReportedPlayers())
+        {
+            effectiveNames.addAll(reportedPlayerStore.getNormalizedNames());
+        }
+        detectorService.syncSuppressionReason(effectiveNames, SuppressionReason.REPORTED);
+    }
+
+    private Set<String> currentAccountReportedNames()
+    {
+        String accountUid = currentAccountUid();
+        Set<String> names = currentSessionReportedNames();
+        if (config.persistReportedPlayers())
+        {
+            names.addAll(reportedPlayerStore.getNormalizedNamesForAccount(accountUid));
+        }
+        return names;
+    }
+
+    private Set<String> otherAccountReportedNames()
     {
         if (!config.persistReportedPlayers())
         {
+            return new LinkedHashSet<>();
+        }
+        Set<String> names = reportedPlayerStore.getNormalizedNames();
+        names.removeAll(currentAccountReportedNames());
+        return names;
+    }
+
+    private Set<String> currentSessionReportedNames()
+    {
+        return new LinkedHashSet<>(sessionReports().getNormalizedNames(currentAccountUid()));
+    }
+
+    private String currentAccountUid()
+    {
+        return activeAccountUid;
+    }
+
+    private String refreshCurrentAccountUid()
+    {
+        if (client == null)
+        {
+            activeAccountUid = null;
+            return null;
+        }
+        long accountHash = client.getAccountHash();
+        String accountUid = accountHash == -1L ? null : Long.toUnsignedString(accountHash);
+        activeAccountUid = accountUid;
+        sessionReports().associateUnattributedReports(accountUid);
+        return accountUid;
+    }
+
+    private ReportedPlayerSession sessionReports()
+    {
+        if (reportedPlayerSession == null)
+        {
+            reportedPlayerSession = new ReportedPlayerSession();
+        }
+        return reportedPlayerSession;
+    }
+
+    private void recordReportedPlayer(String normalizedName, String displayName)
+    {
+        String accountUid = refreshCurrentAccountUid();
+        sessionReports().record(accountUid, normalizedName);
+        detectorService.suppressName(normalizedName, SuppressionReason.REPORTED);
+        refreshPanel(System.currentTimeMillis(), true);
+
+        if (!config.persistReportedPlayers())
+        {
+            return;
+        }
+        if (accountUid == null)
+        {
+            log.warn("Unable to persist reported player because the RuneScape account UID is unavailable");
             return;
         }
 
@@ -571,8 +726,8 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             try
             {
-                reportedPlayerStore.record(normalizedName, displayName, Instant.now());
-                detectorService.suppressName(normalizedName, SuppressionReason.REPORTED);
+                reportedPlayerStore.record(normalizedName, displayName, Instant.now(), accountUid);
+                syncReportedSuppressions();
                 refreshPanel(System.currentTimeMillis(), true);
             }
             catch (IOException ex)
@@ -588,9 +743,9 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             try
             {
-                Set<String> reportedNames = reportedPlayerStore.getNormalizedNames();
                 reportedPlayerStore.clear();
-                detectorService.unsuppressNames(reportedNames, SuppressionReason.REPORTED);
+                sessionReports().clear();
+                syncReportedSuppressions();
                 refreshPanel(System.currentTimeMillis(), true);
             }
             catch (IOException ex)
@@ -900,11 +1055,12 @@ public class DetectAutoAlchersPlugin extends Plugin
         String displayName,
         SuppressionReason suppressionReason)
     {
+        String accountUid = refreshCurrentAccountUid();
         runIo(() ->
         {
             try
             {
-                store.record(normalizedName, displayName, Instant.now());
+                store.record(normalizedName, displayName, Instant.now(), accountUid);
                 if (suppressionReason != null)
                 {
                     detectorService.suppressName(normalizedName, suppressionReason);
@@ -1110,16 +1266,8 @@ public class DetectAutoAlchersPlugin extends Plugin
         {
             try
             {
-                Set<String> oldNames = reportedPlayerStore.getNormalizedNames();
                 reportedPlayerStore.importFrom(path, mode);
-                if (mode == ImportMode.REPLACE)
-                {
-                    detectorService.unsuppressNames(oldNames, SuppressionReason.REPORTED);
-                }
-                if (config.persistReportedPlayers())
-                {
-                    detectorService.suppressNames(reportedPlayerStore.getNormalizedNames(), SuppressionReason.REPORTED);
-                }
+                syncReportedSuppressions();
                 refreshPanel(System.currentTimeMillis(), true);
             }
             catch (IOException ex)

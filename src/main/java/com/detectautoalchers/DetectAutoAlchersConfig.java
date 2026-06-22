@@ -218,7 +218,7 @@ public interface DetectAutoAlchersConfig extends Config
     @ConfigItem(
         keyName = "sortMenuEntriesByConfidence",
         name = "Sort menu entries",
-        description = "Sort right-click player menu entries by detection confidence: high first, then moderate, then unflagged. Default: off.",
+        description = "Sort right-click player menu entries: high confidence first, then moderate confidence, then players reported by another account. Players reported by this account remain unsorted. Default: off.",
         position = 13,
         section = basicSection
     )
@@ -276,10 +276,22 @@ public interface DetectAutoAlchersConfig extends Config
     }
 
     @ConfigItem(
+        keyName = "currentAccountReportedHighlightColor",
+        name = "Reported by this account color",
+        description = "Outline color for players reported by the account running this RuneLite client. Default: #054B24.",
+        position = 18,
+        section = basicSection
+    )
+    default Color currentAccountReportedHighlightColor()
+    {
+        return new Color(5, 75, 36);
+    }
+
+    @ConfigItem(
         keyName = "compactPanelMode",
         name = "Compact panel mode",
         description = "Show shorter suspect rows in the side panel. Default: off.",
-        position = 18,
+        position = 19,
         section = basicSection
     )
     default boolean compactPanelMode()
