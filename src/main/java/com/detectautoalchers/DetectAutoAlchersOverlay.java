@@ -71,22 +71,14 @@ final class DetectAutoAlchersOverlay extends Overlay
                 continue;
             }
 
-            Color reportedColor = reportedColorFor(player.getName());
-            if (reportedColor != null)
+            Color outlineColor = selectOutlineColor(
+                reportedColorFor(player.getName()),
+                detectorService.getConfidence(player.getName()),
+                watchlistStore.contains(player.getName())
+            );
+            if (outlineColor != null)
             {
-                drawPlayer(graphics, player, reportedColor);
-            }
-            else if (watchlistStore.contains(player.getName()))
-            {
-                drawPlayer(graphics, player, WATCHLIST_OUTLINE_COLOR);
-            }
-            else
-            {
-                Color confidenceColor = confidenceColor(detectorService.getConfidence(player.getName()));
-                if (confidenceColor != null)
-                {
-                    drawPlayer(graphics, player, confidenceColor);
-                }
+                drawPlayer(graphics, player, outlineColor);
             }
         }
 
@@ -110,13 +102,23 @@ final class DetectAutoAlchersOverlay extends Overlay
             : null;
     }
 
+    static Color selectOutlineColor(Color reportedColor, DetectionConfidence confidence, boolean watched)
+    {
+        if (reportedColor != null)
+        {
+            return reportedColor;
+        }
+        Color confidenceColor = confidenceColor(confidence);
+        return confidenceColor != null ? confidenceColor : watched ? WATCHLIST_OUTLINE_COLOR : null;
+    }
+
     private String currentAccountUid()
     {
         long accountHash = client.getAccountHash();
         return accountHash == -1L ? null : Long.toUnsignedString(accountHash);
     }
 
-    private Color confidenceColor(DetectionConfidence confidence)
+    private static Color confidenceColor(DetectionConfidence confidence)
     {
         if (confidence == DetectionConfidence.HIGH)
         {
