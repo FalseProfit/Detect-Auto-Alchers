@@ -14,6 +14,26 @@ public class DetectAutoAlchersOverlayTest
 {
     private static final Color LIGHT_GREEN = new Color(144, 238, 144);
     private static final Color CURRENT_ACCOUNT_GREEN = new Color(5, 75, 36);
+    private static final Color HIGH_CONFIDENCE_RED = new Color(255, 48, 48);
+    private static final Color MODERATE_CONFIDENCE_YELLOW = new Color(255, 220, 64);
+    private static final Color WATCHLIST_BLUE = new Color(120, 190, 255);
+
+    @Test
+    public void confidenceHighlightTakesPrecedenceOverWatchlistHighlight()
+    {
+        assertEquals(
+            HIGH_CONFIDENCE_RED,
+            DetectAutoAlchersOverlay.selectOutlineColor(null, DetectionConfidence.HIGH, true)
+        );
+        assertEquals(
+            MODERATE_CONFIDENCE_YELLOW,
+            DetectAutoAlchersOverlay.selectOutlineColor(null, DetectionConfidence.MODERATE, true)
+        );
+        assertEquals(
+            WATCHLIST_BLUE,
+            DetectAutoAlchersOverlay.selectOutlineColor(null, DetectionConfidence.NONE, true)
+        );
+    }
 
     @Test
     public void distinguishesCurrentAccountFromOtherAndLegacyReports() throws Exception

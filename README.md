@@ -38,7 +38,7 @@ RuneLite does not expose a semantic "other player cast High Alchemy" event. Dete
 - Players reported by the current account are outlined and menu-colored `#054B24` by default. Players reported by another local account, or loaded from unattributed legacy history, use the existing light-green reported-player color until the current account also reports them.
 - The three shared player-list files are checked for changes every two seconds so concurrent RuneLite clients receive report, watchlist, and override updates without restarting.
 - The side panel can import, export, and clear local reported-player history.
-- The side panel includes a visual watchlist. Watched players can be outlined and shown in the panel when seen, but watchlist entries do not change detection score or confidence.
+- The side panel includes a visual watchlist. Watched players can be outlined in blue and shown in the panel when seen, but watchlist entries do not change detection score or confidence. Red or yellow confidence outlines take precedence over the blue watchlist outline.
 - The watchlist can remove entries already present in reported-player history, or entries whose normal OSRS hiscore lookup returns not found. The hiscore cleanup is a heuristic and is not proof of a ban, because renamed or missing-name accounts can also fail name-based lookup.
 - The side panel includes an Override list. Override-listed players are suppressed from suspect highlighting until removed from the list.
 - The side panel includes one-shot Conservative, Balanced, and Aggressive preset buttons. Presets write selected detection/scoring settings once; they do not create managed profiles.
